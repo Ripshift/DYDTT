@@ -1,0 +1,182 @@
+/**
+ * DYDTT Phase 1 — Animations
+ * All transitions respect prefers-reduced-motion and the in-app toggle.
+ * .reduce-motion is applied to <html> by motionPrefs.js.
+ */
+
+/* ── Keyframes ─────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0);     }
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0);    }
+}
+
+@keyframes slideInDown {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0);     }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0   rgba(201, 168, 76, 0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(201, 168, 76, 0);   }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes burgerToX-top {
+  from { transform: translateY(0)    rotate(0deg);   }
+  to   { transform: translateY(8px)  rotate(45deg);  }
+}
+
+@keyframes burgerToX-mid {
+  from { opacity: 1; transform: scaleX(1); }
+  to   { opacity: 0; transform: scaleX(0); }
+}
+
+@keyframes burgerToX-bot {
+  from { transform: translateY(0)    rotate(0deg);   }
+  to   { transform: translateY(-8px) rotate(-45deg); }
+}
+
+@keyframes xToBurger-top {
+  from { transform: translateY(8px)  rotate(45deg);  }
+  to   { transform: translateY(0)    rotate(0deg);   }
+}
+
+@keyframes xToBurger-mid {
+  from { opacity: 0; transform: scaleX(0); }
+  to   { opacity: 1; transform: scaleX(1); }
+}
+
+@keyframes xToBurger-bot {
+  from { transform: translateY(-8px) rotate(-45deg); }
+  to   { transform: translateY(0)    rotate(0deg);   }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(100%) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0)     scale(1);  }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateY(0)     scale(1);  }
+  to   { opacity: 0; transform: translateY(100%) scale(0.9); }
+}
+
+/* ── Global transition defaults ────────────────────────────────────────── */
+
+.task-item {
+  animation: fadeInUp var(--duration-fast) var(--ease-out) both;
+}
+
+.modal-overlay {
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.modal-panel {
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+
+.modal-overlay:not(.open) .modal-panel {
+  transform: translateY(100%);
+}
+
+.modal-overlay.open .modal-panel {
+  transform: translateY(0);
+  animation: slideInUp var(--duration-base) var(--ease-spring) both;
+}
+
+.week-cell {
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    transform        var(--duration-fast) var(--ease-out);
+}
+
+.week-cell:hover  { transform: scale(1.04); }
+.week-cell:active { transform: scale(0.97); }
+
+.week-cell.today {
+  animation: pulse 2.4s var(--ease-out) infinite;
+}
+
+/* Burger animations */
+.burger-btn.is-open .burger-btn__bar:nth-child(1) {
+  animation: burgerToX-top var(--duration-fast) var(--ease-spring) both;
+}
+.burger-btn.is-open .burger-btn__bar:nth-child(2) {
+  animation: burgerToX-mid var(--duration-fast) var(--ease-out) both;
+}
+.burger-btn.is-open .burger-btn__bar:nth-child(3) {
+  animation: burgerToX-bot var(--duration-fast) var(--ease-spring) both;
+}
+.burger-btn:not(.is-open) .burger-btn__bar:nth-child(1) {
+  animation: xToBurger-top var(--duration-fast) var(--ease-spring) both;
+}
+.burger-btn:not(.is-open) .burger-btn__bar:nth-child(2) {
+  animation: xToBurger-mid var(--duration-fast) var(--ease-out) both;
+}
+.burger-btn:not(.is-open) .burger-btn__bar:nth-child(3) {
+  animation: xToBurger-bot var(--duration-fast) var(--ease-spring) both;
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-raised) 0%,
+    rgba(255,255,255,0.05) 50%,
+    var(--color-bg-raised) 100%
+  );
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+/* Toast */
+.toast--enter { animation: toastIn  var(--duration-fast) var(--ease-spring) both; }
+.toast--exit  { animation: toastOut var(--duration-fast) var(--ease-out)    both; }
+
+/* ── Reduced motion overrides ───────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration:   0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration:  0.01ms !important;
+    scroll-behavior:      auto   !important;
+  }
+}
+
+html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after {
+  animation-duration:   0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration:  0.01ms !important;
+  scroll-behavior:      auto   !important;
+}

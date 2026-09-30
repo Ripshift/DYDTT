@@ -1,0 +1,66 @@
+/**
+ * DYDTT Phase 1 — CSS Reset
+ * Modern opinionated reset. Builds on top of browser defaults sensibly.
+ */
+
+*, *::before, *::after {
+  box-sizing:  border-box;
+  margin:      0;
+  padding:     0;
+}
+
+html {
+  height:              100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height:      100%;
+  text-rendering:  optimizeSpeed;
+  line-height:     1.5;
+}
+
+img, picture, video, canvas, svg {
+  display:   block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+ul, ol { list-style: none; }
+
+a { text-decoration-skip-ink: auto; }
+
+table {
+  border-collapse: collapse;
+  border-spacing:  0;
+}
+
+dialog {
+  padding:       0;
+  border:        none;
+  background:    transparent;
+  max-width:     100%;
+  max-height:    100%;
+}
+
+[hidden] { display: none !important; }
+
+[disabled] {
+  cursor:  not-allowed;
+  opacity: 0.45;
+}
+
+/* Remove all animations, transitions and smooth scroll for users
+   who prefer not to see them — base-level, overridden in animations.css */
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+}

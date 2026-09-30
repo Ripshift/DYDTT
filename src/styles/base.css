@@ -1,0 +1,171 @@
+/**
+ * DYDTT Phase 1 — Base Styles
+ * Typography, scrollbars, focus rings, utility classes.
+ * Depends on tokens.css and reset.css.
+ */
+
+/* ── Root / body ───────────────────────────────────────────────────────── */
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-bg-base);
+  color:            var(--color-text-primary);
+  font-family:      var(--font-body);
+  font-size:        var(--text-base);
+  line-height:      var(--leading-normal);
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  -webkit-font-smoothing:  antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height:   100dvh;
+  overflow-x:   hidden;
+  overscroll-behavior: none;
+}
+
+/* ── Headings ───────────────────────────────────────────────────────────── */
+
+h1, h2, h3, h4, h5, h6 {
+  font-family:    var(--font-display);
+  font-weight:    300;
+  line-height:    var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color:          var(--color-text-primary);
+}
+
+h1 { font-size: var(--text-3xl); }
+h2 { font-size: var(--text-2xl); }
+h3 { font-size: var(--text-xl);  }
+h4 { font-size: var(--text-lg);  }
+
+/* ── Links ──────────────────────────────────────────────────────────────── */
+
+a {
+  color:           var(--color-gold-400);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+a:hover  { color: var(--color-gold-300); }
+a:active { color: var(--color-gold-200); }
+
+/* ── Focus rings ────────────────────────────────────────────────────────── */
+
+:focus-visible {
+  outline:        2px solid var(--color-gold-400);
+  outline-offset: 3px;
+  border-radius:  var(--radius-sm);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── Scrollbars ─────────────────────────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-subtle) transparent;
+}
+
+*::-webkit-scrollbar        { width: 4px; height: 4px; }
+*::-webkit-scrollbar-track  { background: transparent; }
+*::-webkit-scrollbar-thumb  {
+  background:    var(--color-border-subtle);
+  border-radius: 99px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold-400);
+}
+
+/* ── Selection ──────────────────────────────────────────────────────────── */
+
+::selection {
+  background-color: var(--color-gold-dim);
+  color:            var(--color-text-primary);
+}
+
+/* ── Buttons base ───────────────────────────────────────────────────────── */
+
+button {
+  cursor:      pointer;
+  font-family: inherit;
+  font-size:   inherit;
+  border:      none;
+  background:  none;
+  padding:     0;
+  color:       inherit;
+}
+
+button:disabled {
+  cursor:  not-allowed;
+  opacity: 0.45;
+}
+
+/* ── Inputs base ────────────────────────────────────────────────────────── */
+
+input, textarea, select {
+  font-family: inherit;
+  font-size:   var(--text-sm);
+  color:       var(--color-text-primary);
+  background:  var(--color-bg-raised);
+  border:      1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding:     var(--space-3) var(--space-4);
+  width:       100%;
+  outline:     none;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow   var(--duration-fast) var(--ease-out);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--color-text-disabled);
+}
+
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  border-color: var(--color-gold-400);
+  box-shadow:   0 0 0 3px var(--color-gold-dim);
+}
+
+/* ── Utility classes ────────────────────────────────────────────────────── */
+
+.sr-only {
+  position:   absolute;
+  width:      1px;
+  height:     1px;
+  padding:    0;
+  margin:     -1px;
+  overflow:   hidden;
+  clip:       rect(0,0,0,0);
+  white-space: nowrap;
+  border:     0;
+}
+
+.sr-only-focusable:focus,
+.sr-only-focusable:focus-within {
+  position:   static;
+  width:      auto;
+  height:     auto;
+  padding:    var(--space-2) var(--space-4);
+  margin:     0;
+  overflow:   visible;
+  clip:       auto;
+  white-space: normal;
+}
+
+.text-danger  { color: var(--color-danger); }
+.text-muted   { color: var(--color-text-secondary); }
+.text-gold    { color: var(--color-gold-400); }
+.text-center  { text-align: center; }
+
+.truncate {
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+}

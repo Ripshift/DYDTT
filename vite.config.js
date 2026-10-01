@@ -73,6 +73,7 @@ export default defineConfig({
         'src/firebase.js',          // Firebase SDK init (needs real config + network)
         'src/auth/authManager.js',  // thin Firebase Auth wrapper — test against the Auth emulator later
         'src/db/seed.js',           // dev-only sample data
+        'src/sync/firestoreAdapter.js', // talks to real Firestore — covered by firestore/rules.test.js + manual testing
       ],
       thresholds: {
         lines:      80,

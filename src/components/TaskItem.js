@@ -54,7 +54,7 @@ export default class TaskItem {
     item.setAttribute('tabindex',     '0');
     item.setAttribute('aria-pressed', String(this.#selected));
     item.setAttribute('aria-label',
-      `${t.title}${this.#selected ? ' — selected' : ''}${t.done ? ' — done' : ''}`);
+      `${t.title}${t.seriesId ? ' — repeating' : ''}${this.#selected ? ' — selected' : ''}${t.done ? ' — done' : ''}`);
 
     // ── Checkbox ───────────────────────────────────────────────────────────
     const checkbox = document.createElement('button');
@@ -78,12 +78,13 @@ export default class TaskItem {
     body.appendChild(title);
 
     const metaParts = [];
+    if (t.seriesId)     metaParts.push('↻');
     if (t.reminderAt)   metaParts.push(formatTime(t.reminderAt));
     if (t.tags?.length) metaParts.push(t.tags[0]);
     if (metaParts.length) {
       const meta = document.createElement('div');
       meta.className   = 'task-item__meta';
-      meta.textContent = metaParts.join(' · ');
+      meta.textContent = metaParts.join(' · ').replace(/^↻ · /, '↻ ');
       body.appendChild(meta);
     }
 

@@ -5,10 +5,12 @@ rules_version = '2';
 // Data model
 //   users/{uid}                     (not used yet — read-only)
 //   users/{uid}/tasks/{taskId}      one doc per task; deletes are tombstones (deleted: true)
+//   users/{uid}/series/{seriesId}   repeating-task rules; copies live in tasks with seriesId
 //   users/{uid}/devices/{deviceId}  web-push subscriptions (task 14b)
 //
 // Only the signed-in owner can read or write their own data. Everything else is denied.
 // Local-only fields (e.g. syncStatus) must be stripped before upload — unknown fields are rejected.
+// Every task/series write must set syncedAt = serverTimestamp(); devices pull changes by it.
 // The reminder worker (task 14b) uses a service account, which bypasses these rules.
 
 service cloud.firestore {
@@ -26,8 +28,10 @@ service cloud.firestore {
       let d = request.resource.data;
       return taskId.size() <= 64
         && d.keys().hasOnly(['id', 'date', 'title', 'notes', 'done', 'order', 'reminderAt',
-                             'remindedAt', 'priority', 'tags', 'createdAt', 'updatedAt', 'deleted'])
-        && d.keys().hasAll(['id', 'date', 'title', 'done', 'updatedAt'])
+                             'remindedAt', 'priority', 'tags', 'createdAt', 'updatedAt', 'deleted',
+                             'seriesId', 'slot', 'syncedAt'])
+        && d.keys().hasAll(['id', 'date', 'title', 'done', 'updatedAt', 'syncedAt'])
+        && d.syncedAt == request.time
         && d.id == taskId
         && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && d.title is string && d.title.size() <= 255
@@ -40,7 +44,39 @@ service cloud.firestore {
         && optional(d, 'priority',   d.get('priority', null) == null || d.get('priority', null) is number)
         && optional(d, 'tags',       d.get('tags', []) is list && d.get('tags', []).size() <= 20)
         && optional(d, 'createdAt',  d.get('createdAt', 0) is number)
-        && optional(d, 'deleted',    d.get('deleted', false) is bool);
+        && optional(d, 'deleted',    d.get('deleted', false) is bool)
+        && optional(d, 'seriesId',   d.get('seriesId', '') is string && d.get('seriesId', '').size() <= 64)
+        && optional(d, 'slot',       d.get('slot', 0) is int && d.get('slot', 0) >= 0 && d.get('slot', 0) < 12);
+    }
+
+    function validRule(r) {
+      return r is map
+        && r.keys().hasOnly(['freq', 'interval', 'weekdays', 'monthDay', 'times', 'startDate', 'endDate', 'count'])
+        && r.keys().hasAll(['freq', 'startDate'])
+        && r.freq in ['daily', 'weekly', 'interval', 'monthly']
+        && r.startDate is string && r.startDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && optional(r, 'interval', r.get('interval', 1) is int && r.get('interval', 1) >= 1 && r.get('interval', 1) <= 365)
+        && optional(r, 'weekdays', r.get('weekdays', []) is list && r.get('weekdays', []).size() <= 7)
+        && optional(r, 'monthDay', r.get('monthDay', 1) is int && r.get('monthDay', 1) >= 1 && r.get('monthDay', 1) <= 31)
+        && optional(r, 'times',    r.get('times', []) is list && r.get('times', []).size() <= 12)
+        && optional(r, 'endDate',  r.get('endDate', null) == null
+                                   || (r.get('endDate', '') is string && r.get('endDate', '').matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+        && optional(r, 'count',    r.get('count', null) == null || (r.get('count', 1) is int && r.get('count', 1) >= 1));
+    }
+
+    function validSeries(seriesId) {
+      let d = request.resource.data;
+      return seriesId.size() <= 64
+        && d.keys().hasOnly(['id', 'title', 'notes', 'rule', 'createdAt', 'updatedAt', 'deleted', 'syncedAt'])
+        && d.keys().hasAll(['id', 'title', 'rule', 'updatedAt', 'syncedAt'])
+        && d.id == seriesId
+        && d.syncedAt == request.time
+        && d.title is string && d.title.size() <= 255
+        && d.updatedAt is number
+        && validRule(d.rule)
+        && optional(d, 'notes',     d.get('notes', '') is string && d.get('notes', '').size() <= 5000)
+        && optional(d, 'createdAt', d.get('createdAt', 0) is number)
+        && optional(d, 'deleted',   d.get('deleted', false) is bool);
     }
 
     function validDevice() {
@@ -64,6 +100,11 @@ service cloud.firestore {
       match /tasks/{taskId} {
         allow read, delete:     if isOwner(uid);
         allow create, update:   if isOwner(uid) && validTask(taskId);
+      }
+
+      match /series/{seriesId} {
+        allow read, delete:     if isOwner(uid);
+        allow create, update:   if isOwner(uid) && validSeries(seriesId);
       }
 
       match /devices/{deviceId} {

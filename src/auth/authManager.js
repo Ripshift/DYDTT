@@ -51,8 +51,17 @@ function friendlyError(code) {
     'auth/popup-blocked':        'Popup was blocked — trying redirect instead.',
     'auth/network-request-failed': 'Network error. Check your connection.',
     'auth/too-many-requests':    'Too many attempts. Try again later.',
+    'auth/unauthorized-domain':
+      `Sign-in isn't allowed from this address (${location.hostname}). Add it under Firebase → Authentication → Settings → Authorized domains.`,
+    'auth/operation-not-allowed': 'This sign-in method is turned off in Firebase (Authentication → Sign-in method).',
+    'auth/operation-not-supported-in-this-environment':
+      'This browser can\'t do Google sign-in here. Open the app over https, or use email and password.',
+    'auth/web-storage-unsupported': 'This browser is blocking storage (private mode?), which sign-in needs.',
+    'auth/cancelled-popup-request': 'Sign-in was cancelled.',
+    'auth/internal-error':        'Sign-in failed inside Firebase. Check your connection and try again.',
   };
-  return map[code] ?? 'Something went wrong. Please try again.';
+  // Unknown codes: show the code so the problem can be diagnosed
+  return map[code] ?? `Something went wrong (${code ?? 'unknown error'}). Please try again.`;
 }
 
 // ── Google ────────────────────────────────────────────────────────────────
@@ -72,6 +81,7 @@ export async function signInWithGoogle() {
       await signInWithRedirect(auth, googleProvider);
       return { user: null, error: null };
     }
+    console.error('[Auth] Google sign-in failed:', err.code, err.message);
     return { user: null, error: friendlyError(err.code) };
   }
 }

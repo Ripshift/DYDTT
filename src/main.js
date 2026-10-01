@@ -17,6 +17,7 @@ import { applyMotionPref }     from './utils/motionPrefs.js';
 import { registerSW }          from './utils/sw.js';
 import { initAuth }            from './auth/authManager.js';
 import { initReminders }       from './push/reminders.js';
+import { initSync }            from './sync/index.js';
 import BurgerMenu              from './components/BurgerMenu.js';
 import DayView                 from './components/DayView.js';
 import FortyEightHourView      from './components/FortyEightHourView.js';
@@ -92,6 +93,8 @@ async function boot() {
   router.init();
   if (!import.meta.env.DEV) registerSW();
   initReminders();
+  // Cloud sync (Firestore is loaded only once someone signs in)
+  initSync().catch(err => console.error('[Sync] init failed', err));
 
   console.info('[DYDTT] Boot complete.');
 }

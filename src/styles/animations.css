@@ -82,13 +82,13 @@
 }
 
 @keyframes toastIn {
-  from { opacity: 0; transform: translateY(100%) scale(0.9); }
+  from { opacity: 0; transform: translateY(-100%) scale(0.9); }
   to   { opacity: 1; transform: translateY(0)     scale(1);  }
 }
 
 @keyframes toastOut {
   from { opacity: 1; transform: translateY(0)     scale(1);  }
-  to   { opacity: 0; transform: translateY(100%) scale(0.9); }
+  to   { opacity: 0; transform: translateY(-100%) scale(0.9); }
 }
 
 /* ── Global transition defaults ────────────────────────────────────────── */

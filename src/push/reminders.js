@@ -14,10 +14,10 @@
  */
 
 import { store }             from '../store.js';
-import { getTask, getTasksWithRemindersBetween,
+import { getTask, getTasksWithRemindersBetween, ensureOccurrences, isLive,
          markReminderShown, wasReminderShown } from '../db/schema.js';
 import { sendLocalNotification, getPermissionState } from './client.js';
-import { formatTime }        from '../utils/dateHelpers.js';
+import { formatTime, todayStr, addDays } from '../utils/dateHelpers.js';
 import { showToast }         from '../utils/toast.js';
 import { announce }          from '../utils/a11y.js';
 
@@ -53,6 +53,10 @@ async function plan() {
   timers.forEach(clearTimeout);
   timers.clear();
 
+  // Make sure repeating tasks have their copies for the reminder window
+  const today = todayStr();
+  for (const d of [addDays(today, -1), today, addDays(today, 1)]) await ensureOccurrences(d);
+
   const now   = Date.now();
   const tasks = await getTasksWithRemindersBetween(now - CATCH_UP_MS, now + HORIZON_MS);
 
@@ -73,7 +77,7 @@ async function plan() {
 /** Re-check the task (it may have been edited/completed) and show the reminder once. */
 async function fire(taskId, reminderAt) {
   const task = await getTask(taskId);
-  if (!task || task.done || task.syncStatus === 'pending-delete') return;
+  if (!task || task.done || !isLive(task)) return;
   if (task.reminderAt !== reminderAt) return;                 // time was changed
   if (await wasReminderShown(taskId, reminderAt)) return;
   await markReminderShown(taskId, reminderAt);                // mark first → never twice

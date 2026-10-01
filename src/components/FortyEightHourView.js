@@ -5,7 +5,7 @@
 
 import { store }                                        from '../store.js';
 import { parseDisplayDate, addDays }                    from '../utils/dateHelpers.js';
-import { getTasksForDate }                              from '../db/schema.js';
+import { getTasksForDate, isLive }                              from '../db/schema.js';
 import TaskItem                                          from './TaskItem.js';
 import SwipeController                                   from './SwipeController.js';
 
@@ -62,8 +62,8 @@ export default class FortyEightHourView {
     ]);
 
     const taskSets = [
-      tasks0.filter(t => t.syncStatus !== 'pending-delete'),
-      tasks1.filter(t => t.syncStatus !== 'pending-delete'),
+      tasks0.filter(isLive),
+      tasks1.filter(isLive),
     ];
 
     const selectedId = store.state.ui.selectedTaskId;

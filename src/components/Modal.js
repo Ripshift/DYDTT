@@ -9,8 +9,8 @@ import { store }                                         from '../store.js';
 import { signInWithGoogle, signInWithEmail,
          signUpWithEmail, resetPassword,
          signOutUser }                                   from '../auth/authManager.js';
-import { getTask }                                       from '../db/schema.js';
-import { buildReminderTs }                               from '../utils/dateHelpers.js';
+import EditPanel                                       from './EditPanel.js';
+import { signOutAndClear }                              from '../sync/index.js';
 import { requestPermission, getPermissionState }         from '../push/client.js';
 
 const TABS = ['edit', 'settings', 'auth'];
@@ -27,6 +27,7 @@ export default class Modal {
   #trap     = null;
   #isOpen   = false;
   #currentTab = null;
+  #edit     = null;
   #handlers = new Map();
   #unsubs   = [];
 
@@ -88,43 +89,11 @@ export default class Modal {
   // ── Edit panel ────────────────────────────────────────────────────────────
 
   #buildEditPanel() {
-    const p = document.createElement('div');
-    p.className = 'modal-tab-panel';
-    p.id = 'tab-panel-edit';
-    p.setAttribute('role', 'tabpanel');
-    p.setAttribute('aria-labelledby', 'tab-btn-edit');
-    p.innerHTML = `
-      <div class="modal-edit-context" id="modal-edit-context" aria-live="polite"></div>
-      <div class="form-group">
-        <label class="form-label" for="modal-task-title">Task title</label>
-        <input class="form-input" id="modal-task-title" type="text"
-               placeholder="What needs doing?" autocomplete="off" maxlength="255" required />
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="modal-task-notes">Notes</label>
-        <input class="form-input" id="modal-task-notes" type="text"
-               placeholder="Optional notes..." autocomplete="off" />
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="modal-task-date">Date</label>
-        <input class="form-input" id="modal-task-date" type="date" />
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="modal-task-reminder">Reminder time</label>
-        <input class="form-input" id="modal-task-reminder" type="time" />
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn--ghost text-danger" id="modal-delete-btn"
-                style="margin-right:auto;display:none">Delete task</button>
-        <button class="btn btn--secondary" id="modal-cancel-btn">Cancel</button>
-        <button class="btn btn--primary"   id="modal-save-btn">Save</button>
-      </div>`;
-    requestAnimationFrame(() => {
-      p.querySelector('#modal-cancel-btn').addEventListener('click', () => this.close());
-      p.querySelector('#modal-save-btn').addEventListener('click',   () => this.#saveTask());
-      p.querySelector('#modal-delete-btn').addEventListener('click', () => this.#deleteTask());
+    this.#edit = new EditPanel({
+      onClose: () => this.close(),
+      onTab:   (tab) => store.dispatch('MODAL_OPEN', { tab }),
     });
-    return p;
+    return this.#edit.el;
   }
 
   // ── Settings panel ────────────────────────────────────────────────────────
@@ -287,6 +256,7 @@ export default class Modal {
           <div class="auth-user-email" id="auth-user-email"></div>
         </div>
       </div>
+      <p class="settings-hint">Your tasks sync to this account. Signing out removes them from this device; they stay in your account.</p>
       <button class="btn btn--danger" id="auth-signout-btn" style="width:100%;margin-top:var(--space-5)">
         Sign out
       </button>`;
@@ -350,8 +320,10 @@ export default class Modal {
       });
 
       // Sign out
+      // Uploads pending changes first, then clears this device (tasks stay in the account)
       p.querySelector('#auth-signout-btn').addEventListener('click', async () => {
-        await signOutUser();
+        const done = await signOutAndClear(signOutUser);
+        if (!done) return;
         announce('Signed out');
         this.close();
       });
@@ -428,42 +400,12 @@ export default class Modal {
     this.#currentTab = tab;
     this.#syncTab(tab ?? 'edit');
     if (this.#isOpen && !tabChanged) return;   // other ui changes while open — ignore
-    if (tab === 'edit' || !tab) this.#populateEditForm();   // fresh open or switched to Edit
+    if (tab === 'edit' || !tab) this.#edit.populate();      // fresh open or switched to Edit
     if (this.#isOpen) return;                  // tab switch only — trap already active
     this.#isOpen = true;
     this.#overlay.inert = false;
     this.#overlay.classList.add('open');
     this.#trap.activate();
-  }
-
-  async #populateEditForm() {
-    const selectedId = store.state.ui.selectedTaskId;
-    // Fall back to the DB — in the 48h view the task may be on tomorrow's date
-    const task = selectedId
-      ? (store.state.tasks.find(t => t.id === selectedId) ?? await getTask(selectedId) ?? null)
-      : null;
-    const titleEl    = this.#panel.querySelector('#modal-task-title');
-    const notesEl    = this.#panel.querySelector('#modal-task-notes');
-    const dateEl     = this.#panel.querySelector('#modal-task-date');
-    const reminderEl = this.#panel.querySelector('#modal-task-reminder');
-    const deleteBtn  = this.#panel.querySelector('#modal-delete-btn');
-    const contextEl  = this.#panel.querySelector('#modal-edit-context');
-    if (task) {
-      titleEl.value    = task.title;
-      notesEl.value    = task.notes ?? '';
-      dateEl.value     = task.date;
-      reminderEl.value = task.reminderAt
-        ? new Date(task.reminderAt).toTimeString().slice(0, 5) : '';
-      deleteBtn.style.display = 'inline-flex';
-      contextEl.textContent   = `Editing: ${task.title}`;
-      contextEl.className     = 'modal-edit-context modal-edit-context--editing';
-    } else {
-      titleEl.value = ''; notesEl.value = '';
-      dateEl.value  = store.state.currentDate; reminderEl.value = '';
-      deleteBtn.style.display = 'none';
-      contextEl.textContent   = 'New task';
-      contextEl.className     = 'modal-edit-context modal-edit-context--new';
-    }
   }
 
   #syncClose() {
@@ -475,28 +417,6 @@ export default class Modal {
     this.#trap.deactivate();
   }
 
-  async #saveTask() {
-    const title = this.#panel.querySelector('#modal-task-title').value.trim();
-    if (!title) { this.#panel.querySelector('#modal-task-title').focus(); announce('Task title is required', 'assertive'); return; }
-    const notes   = this.#panel.querySelector('#modal-task-notes').value.trim();
-    const date    = this.#panel.querySelector('#modal-task-date').value || store.state.currentDate;
-    const timeVal = this.#panel.querySelector('#modal-task-reminder').value;
-    // Local date + local time (new Date('YYYY-MM-DD') is UTC and lands a day early in the Americas)
-    const reminderAt = buildReminderTs(date, timeVal);
-    const id = store.state.ui.selectedTaskId;
-    // Only send the fields the form edits; upsertTask merges them into the existing task
-    await store.dispatch('TASK_UPSERT', { ...(id ? { id } : {}), date, title, notes, reminderAt });
-    await store.dispatch('TASK_DESELECT');
-    this.close();
-  }
-
-  async #deleteTask() {
-    const id = store.state.ui.selectedTaskId;
-    if (!id) return;
-    await store.dispatch('TASK_DELETE', { id });
-    this.close();
-  }
-
   open(tab)  { store.dispatch('MODAL_OPEN', { tab: tab ?? 'edit' }); }
   close()    { store.dispatch('MODAL_CLOSE'); this.#emit('close'); }
   on(event, fn) {
@@ -505,5 +425,5 @@ export default class Modal {
     return () => this.#handlers.get(event).delete(fn);
   }
   #emit(event)  { this.#handlers.get(event)?.forEach(fn => fn()); }
-  destroy()     { this.#unsubs.forEach(u => u()); }
+  destroy()     { this.#unsubs.forEach(u => u()); this.#edit?.destroy(); }
 }

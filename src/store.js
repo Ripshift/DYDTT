@@ -3,9 +3,10 @@
  */
 
 import {
-  getTasksForDate, getTask, upsertTask, deleteTask, hardDeleteTask,
-  getWeeklySummary, getSetting, setSetting, enqueueSyncAction,
+  getLiveTasksForDate, getTask, upsertTask, deleteTask, hardDeleteTask,
+  getWeeklySummary, getSetting, setSetting, clearDay, wipeAll,
 } from './db/schema.js';
+import { createFromForm, editOneTime, editOccurrence, removeTask } from './tasks/taskService.js';
 import { getWeekGridDates, todayStr, addDays } from './utils/dateHelpers.js';
 import { applyMotionPref }            from './utils/motionPrefs.js';
 
@@ -27,6 +28,13 @@ const initialState = {
     modalTab:       'edit',
     selectedTaskId: null,
     syncPending:    false,
+  },
+  // Cloud sync status (see src/sync/)
+  sync: {
+    status:       'off',     // off | idle | syncing | offline | error
+    pending:      0,         // changes waiting to upload
+    lastSyncedAt: null,
+    error:        null,
   },
 };
 
@@ -70,9 +78,19 @@ function createStore(initial) {
         break;
       case 'NAV_TO_DATE': {
         patch('currentDate', payload.date);
-        const tasks = await getTasksForDate(payload.date);
-        patch('tasks', tasks.filter(t => t.syncStatus !== 'pending-delete'));
+        patch('tasks', await getLiveTasksForDate(payload.date));
         patchUi({ selectedTaskId: null });
+        await dispatch('REFRESH_WEEKLY_SUMMARY');
+        break;
+      }
+
+      // Reload the visible day + summary (e.g. after a sync brought changes)
+      case 'REFRESH': {
+        patch('tasks', await getLiveTasksForDate(state.currentDate));
+        if (state.ui.selectedTaskId && !state.tasks.some(t => t.id === state.ui.selectedTaskId)) {
+          const sel = await getTask(state.ui.selectedTaskId);
+          if (!sel || sel.deleted) patchUi({ selectedTaskId: null });
+        }
         await dispatch('REFRESH_WEEKLY_SUMMARY');
         break;
       }
@@ -89,14 +107,49 @@ function createStore(initial) {
 
       // ── Tasks ────────────────────────────────────────────────────────────
       case 'TASK_UPSERT': {
-        const record = await upsertTask(payload);
-        await enqueueSyncAction('upsert', record);
-        const tasks = await getTasksForDate(state.currentDate);
-        patch('tasks', tasks.filter(t => t.syncStatus !== 'pending-delete'));
-        await dispatch('REFRESH_WEEKLY_SUMMARY');
-        patchUi({ syncPending: true });
+        await upsertTask(payload);
+        await dispatch('REFRESH');
         break;
       }
+
+      // Save the edit form. payload: { form, id?, scope? ('this' | 'future') }
+      case 'TASK_SAVE': {
+        const existing = payload.id ? await getTask(payload.id) : null;
+        let result;
+        if (!existing)              result = await createFromForm(payload.form);
+        else if (existing.seriesId) result = await editOccurrence(existing, payload.form, payload.scope ?? 'this');
+        else                        result = await editOneTime(existing, payload.form);
+        patchUi({ selectedTaskId: null });
+        await dispatch('REFRESH');
+        return result;
+      }
+
+      // Delete with a scope for repeating tasks. payload: { id, scope ('this' | 'future' | 'all') }
+      case 'TASK_REMOVE': {
+        const task = await getTask(payload.id);
+        if (task) await removeTask(task, payload.scope ?? 'this');
+        patchUi({ selectedTaskId: null });
+        await dispatch('REFRESH');
+        break;
+      }
+
+      case 'DAY_CLEAR': {
+        const n = await clearDay(payload.date ?? state.currentDate);
+        patchUi({ selectedTaskId: null });
+        await dispatch('REFRESH');
+        return n;
+      }
+
+      case 'CALENDAR_WIPE': {
+        await wipeAll();
+        patchUi({ selectedTaskId: null });
+        await dispatch('REFRESH');
+        break;
+      }
+
+      case 'SYNC_STATUS':
+        patch('sync', { ...state.sync, ...payload });
+        break;
       case 'TASK_TOGGLE': {
         // Look in the DB too — the 48h view shows tasks outside currentDate
         const task = state.tasks.find(t => t.id === payload.id) ?? await getTask(payload.id);
@@ -106,12 +159,8 @@ function createStore(initial) {
       }
       case 'TASK_DELETE': {
         await deleteTask(payload.id);
-        await enqueueSyncAction('delete', { id: payload.id });
         if (state.ui.selectedTaskId === payload.id) patchUi({ selectedTaskId: null });
-        const tasks = await getTasksForDate(state.currentDate);
-        patch('tasks', tasks.filter(t => t.syncStatus !== 'pending-delete'));
-        await dispatch('REFRESH_WEEKLY_SUMMARY');
-        patchUi({ syncPending: true });
+        await dispatch('REFRESH');
         break;
       }
       case 'TASK_HARD_DELETE':
@@ -154,8 +203,7 @@ function createStore(initial) {
     const settings = { ...initial.settings };
     keys.forEach((k, i) => { if (vals[i] !== null) settings[k] = vals[i]; });
     patch('settings', settings);
-    const tasks = await getTasksForDate(state.currentDate);
-    patch('tasks', tasks.filter(t => t.syncStatus !== 'pending-delete'));
+    patch('tasks', await getLiveTasksForDate(state.currentDate));
     await dispatch('REFRESH_WEEKLY_SUMMARY');
   }
 

@@ -99,6 +99,12 @@ export function occursOn(rule, dateStr) {
   return true;
 }
 
+/** Days since 1970-01-01 for a YYYY-MM-DD date (timezone-free). Stored as `day` for sharing rules. */
+export function epochDay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / DAY_MS);
+}
+
 /** Deterministic occurrence id — the same on every device. */
 export function occurrenceId(seriesId, dateStr, slot) {
   return `${seriesId}_${dateStr}_${slot}`;
@@ -118,6 +124,7 @@ export function occurrencesFor(series, dateStr) {
     date:       dateStr,
     title:      series.title,
     notes:      series.notes ?? '',
+    private:    Boolean(series.private),
     done:       false,
     reminderAt: time ? buildReminderTs(dateStr, time) : null,
     // Keep a series' occurrences together, in time order

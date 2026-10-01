@@ -18,6 +18,8 @@ import { registerSW }          from './utils/sw.js';
 import { initAuth }            from './auth/authManager.js';
 import { initReminders }       from './push/reminders.js';
 import { initSync }            from './sync/index.js';
+import { initSocial }          from './social/social.js';
+import SharedBar               from './components/SharedBar.js';
 import BurgerMenu              from './components/BurgerMenu.js';
 import DayView                 from './components/DayView.js';
 import FortyEightHourView      from './components/FortyEightHourView.js';
@@ -81,6 +83,9 @@ async function boot() {
   burger.on('close', () => modal.close());
   store.subscribe('ui', (ui) => burger.setExpanded(ui.modalOpen));
 
+  // Viewing a friend's / family member's calendar: their name + X replace the burger
+  new SharedBar({ container: topBar, burgerEl: topBar.querySelector('.burger-btn') });
+
   const main = document.createElement('main');
   main.id = 'main-content';
   main.setAttribute('role', 'main');
@@ -95,6 +100,8 @@ async function boot() {
   initReminders();
   // Cloud sync (Firestore is loaded only once someone signs in)
   initSync().catch(err => console.error('[Sync] init failed', err));
+  // Friends & Family (profile, code, connections)
+  initSocial().catch(err => console.error('[Social] init failed', err));
 
   console.info('[DYDTT] Boot complete.');
 }

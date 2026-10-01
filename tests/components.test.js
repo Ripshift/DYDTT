@@ -21,6 +21,12 @@ describe('TaskItem', () => {
     expect(el.querySelector('.task-checkbox').getAttribute('aria-checked')).toBe('true');
   });
 
+  it('private + repeating icons come first', () => {
+    const el = new TaskItem({ ...base, private: true, seriesId: 's', reminderAt: new Date(2026, 9, 1, 9, 30).getTime() }).el;
+    expect(el.querySelector('.task-item__meta').textContent).toBe('🔒 ↻ 9:30 AM');
+    expect(el.getAttribute('aria-label')).toBe('Walk dog — private — repeating');
+  });
+
   it('low priority, no meta when nothing to show', () => {
     const el = new TaskItem({ ...base, priority: 2 }).el;
     expect(el.className).toContain('task-item--low-priority');

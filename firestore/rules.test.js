@@ -1,6 +1,6 @@
 import { describe, it, beforeAll, afterAll, beforeEach } from 'vitest';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, collectionGroup, query, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, collectionGroup, query, where, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 
 let env;
@@ -20,6 +20,8 @@ beforeEach(() => env.clearFirestore());
 const alice = () => env.authenticatedContext('alice').firestore();
 const bob   = () => env.authenticatedContext('bob').firestore();
 const anon  = () => env.unauthenticatedContext().firestore();
+const carol = () => env.authenticatedContext('carol').firestore();
+const admin = (fn) => env.withSecurityRulesDisabled(c => fn(c.firestore()));
 
 describe('tasks', () => {
   it('owner can create, read, update, tombstone and delete', async () => {
@@ -142,5 +144,155 @@ describe('user doc + everything else', () => {
     await assertFails(getDoc(doc(bob(), 'users/alice')));
     await assertFails(setDoc(doc(alice(), 'users/alice/other/x'), { a: 1 }));
     await assertFails(setDoc(doc(alice(), 'public/x'), { a: 1 }));
+  });
+});
+
+// ══ Friends & Family ═══════════════════════════════════════════════════════
+
+const DAY_MS = 86_400_000;
+const today = Math.floor(Date.now() / DAY_MS);
+const dateOf = (day) => new Date(day * DAY_MS).toISOString().slice(0, 10);
+const TT = (id, day, over = {}) => ({ id, date: dateOf(day), title: id, done: false, updatedAt: 1,
+  private: false, day, syncedAt: 1, ...over });
+
+describe('profiles + codes', () => {
+  it('claim a code, then save a profile that points at it', async () => {
+    const db = alice();
+    await assertSucceeds(setDoc(doc(db, 'codes/Ab3dE9xQ'), { uid: 'alice', createdAt: 1 }));
+    await assertSucceeds(setDoc(doc(db, 'profiles/alice'), { name: 'Alice', photo: '', code: 'Ab3dE9xQ', updatedAt: 1 }));
+    await assertSucceeds(setDoc(doc(db, 'profiles/alice'), { name: 'Alice B', photo: 'data:image/jpeg;base64,AAAA', code: 'Ab3dE9xQ', updatedAt: 2 }));
+    await assertSucceeds(getDoc(doc(bob(), 'profiles/alice')));            // anyone signed in can read by id
+    await assertSucceeds(getDoc(doc(bob(), 'codes/Ab3dE9xQ')));
+    await assertFails(getDoc(doc(anon(), 'profiles/alice')));
+    await assertFails(getDocs(collection(bob(), 'profiles')));             // no browsing
+    await assertFails(getDocs(collection(bob(), 'codes')));
+  });
+
+  it('cannot take someone else\'s code or write their profile', async () => {
+    await admin(db => setDoc(doc(db, 'codes/Ab3dE9xQ'), { uid: 'alice', createdAt: 1 }));
+    await assertFails(setDoc(doc(bob(), 'codes/Ab3dE9xQ'), { uid: 'bob', createdAt: 1 }));     // exists → update → denied
+    await assertFails(setDoc(doc(bob(), 'codes/Zz9yXx8W'), { uid: 'alice', createdAt: 1 }));   // for someone else
+    await assertFails(setDoc(doc(bob(), 'codes/short'), { uid: 'bob', createdAt: 1 }));
+    await assertFails(setDoc(doc(bob(), 'profiles/bob'), { name: 'Bob', photo: '', code: 'Ab3dE9xQ', updatedAt: 1 }));  // not his code
+    await assertFails(setDoc(doc(bob(), 'profiles/alice'), { name: 'X', photo: '', code: 'Ab3dE9xQ', updatedAt: 1 }));
+    await assertFails(deleteDoc(doc(bob(), 'codes/Ab3dE9xQ')));
+    await assertSucceeds(deleteDoc(doc(alice(), 'codes/Ab3dE9xQ')));
+  });
+
+  it('profile validation', async () => {
+    await admin(db => setDoc(doc(db, 'codes/Ab3dE9xQ'), { uid: 'alice', createdAt: 1 }));
+    const P = (o) => ({ name: 'Alice', photo: '', code: 'Ab3dE9xQ', updatedAt: 1, ...o });
+    await assertFails(setDoc(doc(alice(), 'profiles/alice'), P({ name: '' })));
+    await assertFails(setDoc(doc(alice(), 'profiles/alice'), P({ name: 'x'.repeat(51) })));
+    await assertFails(setDoc(doc(alice(), 'profiles/alice'), P({ photo: 'javascript:alert(1)' })));
+    await assertFails(setDoc(doc(alice(), 'profiles/alice'), P({ photo: 'data:image/jpeg;base64,' + 'A'.repeat(140000) })));
+    await assertFails(setDoc(doc(alice(), 'profiles/alice'), P({ email: 'a@b.c' })));
+    await assertSucceeds(setDoc(doc(alice(), 'profiles/alice'), P({ photo: 'https://lh3.googleusercontent.com/a/x=s96-c' })));
+  });
+});
+
+describe('requests → connection', () => {
+  it('bob asks alice; alice accepts in one batch; both become viewers with their own levels', async () => {
+    // bob → alice, bob lets alice see "family"
+    const b = writeBatch(bob());
+    b.set(doc(bob(), 'users/alice/requests/bob'), { from: 'bob', level: 'family', createdAt: 1 });
+    b.set(doc(bob(), 'users/bob/outgoing/alice'), { to: 'alice', level: 'family', createdAt: 1 });
+    await assertSucceeds(b.commit());
+    await assertSucceeds(getDocs(collection(alice(), 'users/alice/requests')));
+    await assertFails(getDocs(collection(carol(), 'users/alice/requests')));
+
+    const a = writeBatch(alice());
+    a.set(doc(alice(), 'users/alice/viewers/bob'), { level: 'friend', since: 1 });   // alice lets bob see "friend"
+    a.set(doc(alice(), 'users/bob/viewers/alice'), { level: 'family', since: 1 });   // as bob offered
+    a.delete(doc(alice(), 'users/alice/requests/bob'));
+    await assertSucceeds(a.commit());
+    await assertSucceeds(getDoc(doc(bob(), 'users/alice/viewers/bob')));             // bob can see his own level
+  });
+
+  it('cannot upgrade yourself, add yourself without a request, or forge requests', async () => {
+    await assertFails(setDoc(doc(alice(), 'users/bob/viewers/alice'), { level: 'family', since: 1 }));      // no request
+    await admin(db => setDoc(doc(db, 'users/alice/requests/bob'), { from: 'bob', level: 'friend', createdAt: 1 }));
+    await assertFails(setDoc(doc(alice(), 'users/bob/viewers/alice'), { level: 'family', since: 1 }));      // more than offered
+    await assertSucceeds(setDoc(doc(alice(), 'users/bob/viewers/alice'), { level: 'friend', since: 1 }));
+    await assertFails(updateDoc(doc(alice(), 'users/bob/viewers/alice'), { level: 'family' }));             // only bob changes it
+    await assertSucceeds(updateDoc(doc(bob(), 'users/bob/viewers/alice'), { level: 'family' }));
+    await assertFails(setDoc(doc(carol(), 'users/alice/requests/bob'), { from: 'bob', level: 'family', createdAt: 1 })); // pretending
+    await assertFails(setDoc(doc(carol(), 'users/carol/requests/carol'), { from: 'carol', level: 'family', createdAt: 1 }));
+    await assertFails(setDoc(doc(carol(), 'users/alice/requests/carol'), { from: 'carol', level: 'boss', createdAt: 1 }));
+  });
+
+  it('either side can disconnect', async () => {
+    await admin(async db => {
+      await setDoc(doc(db, 'users/alice/viewers/bob'), { level: 'friend', since: 1 });
+      await setDoc(doc(db, 'users/bob/viewers/alice'), { level: 'friend', since: 1 });
+    });
+    const b = writeBatch(bob());
+    b.delete(doc(bob(), 'users/bob/viewers/alice'));
+    b.delete(doc(bob(), 'users/alice/viewers/bob'));
+    await assertSucceeds(b.commit());
+    await assertFails(deleteDoc(doc(carol(), 'users/alice/viewers/bob')));
+  });
+});
+
+describe('viewing shared tasks', () => {
+  async function seed(level) {
+    await admin(async db => {
+      await setDoc(doc(db, 'users/alice/viewers/bob'), { level, since: 1 });
+      await setDoc(doc(db, 'users/alice/tasks/near'),    TT('near', today));
+      await setDoc(doc(db, 'users/alice/tasks/far'),     TT('far', today + 10));
+      await setDoc(doc(db, 'users/alice/tasks/secret'),  TT('secret', today, { private: true }));
+      await setDoc(doc(db, 'users/alice/series/s1'),     { id: 's1', title: 'Meds', rule: { freq: 'daily', startDate: dateOf(today) }, updatedAt: 1, private: false, syncedAt: 1 });
+      await setDoc(doc(db, 'users/alice/series/s2'),     { id: 's2', title: 'Diary', rule: { freq: 'daily', startDate: dateOf(today) }, updatedAt: 1, private: true, syncedAt: 1 });
+    });
+  }
+
+  it('friend: only non-private tasks within a few days, read-only', async () => {
+    await seed('friend');
+    const db = bob();
+    const tasks = collection(db, 'users/alice/tasks');
+    await assertSucceeds(getDocs(query(tasks, where('private', '==', false), where('day', '>=', today - 1), where('day', '<=', today + 1))));
+    await assertFails(getDocs(query(tasks, where('private', '==', false))));                       // no date limit
+    await assertFails(getDocs(query(tasks, where('day', '>=', today - 1), where('day', '<=', today + 1))));  // could include private
+    await assertSucceeds(getDoc(doc(db, 'users/alice/tasks/near')));
+    await assertFails(getDoc(doc(db, 'users/alice/tasks/far')));
+    await assertFails(getDoc(doc(db, 'users/alice/tasks/secret')));
+    await assertSucceeds(getDocs(query(collection(db, 'users/alice/series'), where('private', '==', false))));
+    await assertFails(getDoc(doc(db, 'users/alice/series/s2')));
+    await assertFails(updateDoc(doc(db, 'users/alice/tasks/near'), { done: true, updatedAt: 2, syncedAt: serverTimestamp() }));
+  });
+
+  it('family: every non-private task, and can tick / untick only', async () => {
+    await seed('family');
+    const db = bob();
+    await assertSucceeds(getDocs(query(collection(db, 'users/alice/tasks'), where('private', '==', false))));
+    await assertSucceeds(getDoc(doc(db, 'users/alice/tasks/far')));
+    await assertFails(getDoc(doc(db, 'users/alice/tasks/secret')));
+    await assertSucceeds(updateDoc(doc(db, 'users/alice/tasks/near'), { done: true, updatedAt: 2, syncedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(doc(db, 'users/alice/tasks/near'), { done: false, updatedAt: 3, syncedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db, 'users/alice/tasks/near'), { title: 'Hacked', updatedAt: 4, syncedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db, 'users/alice/tasks/secret'), { done: true, updatedAt: 4, syncedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db, 'users/alice/tasks/near'), { done: true, updatedAt: 4, syncedAt: 5 }));
+    await assertFails(deleteDoc(doc(db, 'users/alice/tasks/near')));
+    await assertFails(setDoc(doc(db, 'users/alice/tasks/new'), { ...TT('new', today), syncedAt: serverTimestamp() }));  // can't add tasks
+  });
+
+  it('family: first tick of a repeat copy creates it; must match a shared series', async () => {
+    await seed('family');
+    const db = bob();
+    const id = `s1_${dateOf(today)}_0`;
+    const occ = { id, date: dateOf(today), title: 'Meds', notes: '', done: true, order: 0, reminderAt: null,
+      createdAt: 1, updatedAt: 2, deleted: false, private: false, seriesId: 's1', slot: 0, day: today, syncedAt: serverTimestamp() };
+    await assertFails(setDoc(doc(db, `users/alice/tasks/s1_${dateOf(today)}_1`), occ));           // id mismatch
+    await assertFails(setDoc(doc(db, `users/alice/tasks/s2_${dateOf(today)}_0`), { ...occ, id: `s2_${dateOf(today)}_0`, seriesId: 's2', title: 'Diary' }));  // private series
+    await assertFails(setDoc(doc(db, `users/alice/tasks/${id}`), { ...occ, title: 'Other' }));    // title must match
+    await assertSucceeds(setDoc(doc(db, `users/alice/tasks/${id}`), occ));
+  });
+
+  it('strangers and removed contacts see nothing', async () => {
+    await seed('family');
+    await assertFails(getDoc(doc(carol(), 'users/alice/tasks/near')));
+    await assertFails(getDocs(query(collection(carol(), 'users/alice/tasks'), where('private', '==', false))));
+    await admin(db => deleteDoc(doc(db, 'users/alice/viewers/bob')));
+    await assertFails(getDoc(doc(bob(), 'users/alice/tasks/near')));
   });
 });

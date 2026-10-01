@@ -20,7 +20,7 @@
     "seed": "node --experimental-vm-modules src/db/seed.js",
     "icons": "node scripts/generate-icons.mjs",
     "test:rules": "pnpm dlx firebase-tools@14 emulators:exec --only firestore --project demo-dydtt \"vitest run --config firestore/vitest.config.js\"",
-    "deploy:rules": "pnpm dlx firebase-tools@14 deploy --only firestore:rules --project dydtt-c3633"
+    "deploy:rules": "pnpm dlx firebase-tools@14 deploy --only firestore:rules,firestore:indexes --project dydtt-c3633"
   },
   "dependencies": {
     "dexie": "^4.0.8",

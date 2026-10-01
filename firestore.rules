@@ -8,6 +8,15 @@ rules_version = '2';
 //   users/{uid}/series/{seriesId}   repeating-task rules; copies live in tasks with seriesId
 //   users/{uid}/devices/{deviceId}  web-push subscriptions (task 14b)
 //
+// Friends & Family
+//   profiles/{uid}                  { name, photo, code } — any signed-in user can read one by id
+//   codes/{code}                    { uid } — look someone up by their 8-character code
+//   users/{to}/requests/{from}      connection request; level = what "from" lets "to" see
+//   users/{uid}/outgoing/{to}       my sent requests
+//   users/{owner}/viewers/{viewer}  viewer may see owner's non-private tasks:
+//                                     friend → only within ±2 days of today (UTC), read-only
+//                                     family → all, and may tick tasks done / not done
+//
 // Only the signed-in owner can read or write their own data. Everything else is denied.
 // Local-only fields (e.g. syncStatus) must be stripped before upload — unknown fields are rejected.
 // Every task/series write must set syncedAt = serverTimestamp(); devices pull changes by it.
@@ -24,12 +33,52 @@ service cloud.firestore {
       return !(key in d) || typeOk;
     }
 
+    // ── Friends & Family helpers ─────────────────────────────────────────
+    function viewerPath(owner) {
+      return /databases/$(database)/documents/users/$(owner)/viewers/$(request.auth.uid);
+    }
+    function isViewer(owner) {
+      return request.auth != null && exists(viewerPath(owner));
+    }
+    function viewerLevel(owner) {
+      return get(viewerPath(owner)).data.level;
+    }
+    function todayDay() {
+      return math.floor(request.time.toMillis() / 86400000);
+    }
+    // Friends: ±2 days around today in UTC covers yesterday/today/tomorrow in every time zone
+    function canViewTask(owner, t) {
+      return isViewer(owner) && t.private == false
+        && (viewerLevel(owner) == 'family' || (t.day >= todayDay() - 2 && t.day <= todayDay() + 2));
+    }
+    // Family may only flip done (+ timestamps) on a non-private task
+    function familyTick(owner) {
+      let d = request.resource.data;
+      return isViewer(owner) && viewerLevel(owner) == 'family'
+        && resource.data.private == false
+        && d.diff(resource.data).affectedKeys().hasOnly(['done', 'updatedAt', 'syncedAt'])
+        && d.done is bool && d.updatedAt is number && d.syncedAt == request.time;
+    }
+    // Family ticking a repeat copy that only existed on the owner's devices so far
+    function familyCreate(owner, taskId) {
+      let d = request.resource.data;
+      let seriesPath = /databases/$(database)/documents/users/$(owner)/series/$(d.get('seriesId', '-'));
+      return isViewer(owner) && viewerLevel(owner) == 'family'
+        && validTask(taskId)
+        && d.private == false && d.get('deleted', false) == false
+        && d.get('seriesId', '') is string && d.get('seriesId', '') != ''
+        && taskId == d.seriesId + '_' + d.date + '_' + string(d.slot)
+        && exists(seriesPath)
+        && get(seriesPath).data.private == false
+        && get(seriesPath).data.title == d.title;
+    }
+
     function validTask(taskId) {
       let d = request.resource.data;
       return taskId.size() <= 64
         && d.keys().hasOnly(['id', 'date', 'title', 'notes', 'done', 'order', 'reminderAt',
                              'remindedAt', 'priority', 'tags', 'createdAt', 'updatedAt', 'deleted',
-                             'seriesId', 'slot', 'syncedAt'])
+                             'seriesId', 'slot', 'syncedAt', 'private', 'day'])
         && d.keys().hasAll(['id', 'date', 'title', 'done', 'updatedAt', 'syncedAt'])
         && d.syncedAt == request.time
         && d.id == taskId
@@ -46,7 +95,9 @@ service cloud.firestore {
         && optional(d, 'createdAt',  d.get('createdAt', 0) is number)
         && optional(d, 'deleted',    d.get('deleted', false) is bool)
         && optional(d, 'seriesId',   d.get('seriesId', '') is string && d.get('seriesId', '').size() <= 64)
-        && optional(d, 'slot',       d.get('slot', 0) is int && d.get('slot', 0) >= 0 && d.get('slot', 0) < 12);
+        && optional(d, 'slot',       d.get('slot', 0) is int && d.get('slot', 0) >= 0 && d.get('slot', 0) < 12)
+        && optional(d, 'private',    d.get('private', false) is bool)
+        && optional(d, 'day',        d.get('day', 0) is int);
     }
 
     function validRule(r) {
@@ -67,7 +118,7 @@ service cloud.firestore {
     function validSeries(seriesId) {
       let d = request.resource.data;
       return seriesId.size() <= 64
-        && d.keys().hasOnly(['id', 'title', 'notes', 'rule', 'createdAt', 'updatedAt', 'deleted', 'syncedAt'])
+        && d.keys().hasOnly(['id', 'title', 'notes', 'rule', 'createdAt', 'updatedAt', 'deleted', 'syncedAt', 'private'])
         && d.keys().hasAll(['id', 'title', 'rule', 'updatedAt', 'syncedAt'])
         && d.id == seriesId
         && d.syncedAt == request.time
@@ -76,7 +127,24 @@ service cloud.firestore {
         && validRule(d.rule)
         && optional(d, 'notes',     d.get('notes', '') is string && d.get('notes', '').size() <= 5000)
         && optional(d, 'createdAt', d.get('createdAt', 0) is number)
-        && optional(d, 'deleted',   d.get('deleted', false) is bool);
+        && optional(d, 'deleted',   d.get('deleted', false) is bool)
+        && optional(d, 'private',   d.get('private', false) is bool);
+    }
+
+    function validProfile(pid) {
+      let d = request.resource.data;
+      let codePath = /databases/$(database)/documents/codes/$(d.code);
+      return d.keys().hasOnly(['name', 'photo', 'code', 'updatedAt'])
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 50
+        && d.photo is string && d.photo.size() <= 140000
+        && (d.photo == '' || d.photo.matches('^(https://|data:image/(jpeg|png|webp);base64,).*'))
+        && d.code is string && d.code.matches('^[A-Za-z0-9]{8}$')
+        && exists(codePath) && get(codePath).data.uid == pid
+        && optional(d, 'updatedAt', d.get('updatedAt', 0) is number);
+    }
+
+    function validLevel(level) {
+      return level in ['friend', 'family'];
     }
 
     function validDevice() {
@@ -92,19 +160,72 @@ service cloud.firestore {
         && optional(d, 'updatedAt', d.get('updatedAt', 0) is number);
     }
 
+    match /profiles/{pid} {
+      allow get:              if request.auth != null;
+      allow list:             if false;
+      allow create, update:   if request.auth != null && request.auth.uid == pid && validProfile(pid);
+      allow delete:           if request.auth != null && request.auth.uid == pid;
+    }
+
+    match /codes/{code} {
+      allow get:              if request.auth != null;
+      allow list, update:     if false;
+      allow create:           if request.auth != null && code.matches('^[A-Za-z0-9]{8}$')
+                                && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+                                && request.resource.data.uid == request.auth.uid;
+      allow delete:           if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
     match /users/{uid} {
       // No profile doc is needed yet; subcollections work without it.
       allow read:  if isOwner(uid);
       allow write: if false;
 
       match /tasks/{taskId} {
-        allow read, delete:     if isOwner(uid);
-        allow create, update:   if isOwner(uid) && validTask(taskId);
+        allow read:   if isOwner(uid) || canViewTask(uid, resource.data);
+        allow delete: if isOwner(uid);
+        allow create: if (isOwner(uid) && validTask(taskId)) || familyCreate(uid, taskId);
+        allow update: if (isOwner(uid) && validTask(taskId)) || familyTick(uid);
       }
 
       match /series/{seriesId} {
-        allow read, delete:     if isOwner(uid);
+        allow read:             if isOwner(uid) || (isViewer(uid) && resource.data.private == false);
+        allow delete:           if isOwner(uid);
         allow create, update:   if isOwner(uid) && validSeries(seriesId);
+      }
+
+      // Connection requests sent TO this user
+      match /requests/{from} {
+        allow read, delete:     if request.auth != null && (request.auth.uid == uid || request.auth.uid == from);
+        allow create, update:   if request.auth != null && request.auth.uid == from && from != uid
+                                  && request.resource.data.keys().hasOnly(['from', 'level', 'createdAt'])
+                                  && request.resource.data.from == from
+                                  && validLevel(request.resource.data.level);
+      }
+
+      // Requests this user has sent (their own bookkeeping)
+      match /outgoing/{to} {
+        allow read, delete:     if isOwner(uid);
+        allow create, update:   if isOwner(uid)
+                                  && request.resource.data.keys().hasOnly(['to', 'level', 'createdAt'])
+                                  && validLevel(request.resource.data.level);
+      }
+
+      // Who may view this user's tasks, and how much (set by this user)
+      match /viewers/{viewer} {
+        allow read, delete:     if isOwner(uid) || (request.auth != null && request.auth.uid == viewer);
+        allow update:           if isOwner(uid)
+                                  && request.resource.data.keys().hasOnly(['level', 'since'])
+                                  && validLevel(request.resource.data.level);
+        // The owner adds a viewer, or the viewer accepts the owner's request
+        // (the owner's level choice travels in that request)
+        allow create:           if request.resource.data.keys().hasOnly(['level', 'since'])
+                                  && validLevel(request.resource.data.level)
+                                  && (isOwner(uid)
+                                      || (request.auth != null && request.auth.uid == viewer
+                                          && exists(/databases/$(database)/documents/users/$(viewer)/requests/$(uid))
+                                          && get(/databases/$(database)/documents/users/$(viewer)/requests/$(uid)).data.level
+                                             == request.resource.data.level));
       }
 
       match /devices/{deviceId} {

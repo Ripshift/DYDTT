@@ -67,7 +67,8 @@ describe('toRemote', () => {
   it('keeps only allowed fields', () => {
     const r = toRemote({ id: 'a', date: '2026-10-01', title: 'x'.repeat(300), done: false, updatedAt: 1,
       syncStatus: 'pending-upsert', generated: true, junk: 1, notes: undefined }, TASK_FIELDS);
-    expect(Object.keys(r).sort()).toEqual(['date', 'deleted', 'done', 'id', 'title', 'updatedAt']);
+    expect(Object.keys(r).sort()).toEqual(['date', 'day', 'deleted', 'done', 'id', 'private', 'title', 'updatedAt']);
+    expect(r).toMatchObject({ private: false, day: 20727 });
     expect(r.title).toHaveLength(255);
   });
 });

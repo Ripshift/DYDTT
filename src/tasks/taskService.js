@@ -5,6 +5,7 @@
  * Form shape (from the Edit tab):
  *   {
  *     title, notes, date,
+ *     private: boolean,                 // hidden from friends & family
  *     time:   'HH:MM' | '',            // single reminder time
  *     repeat: {
  *       freq:     'none' | 'daily' | 'several' | 'weekly' | 'interval' | 'monthly',
@@ -55,6 +56,7 @@ export function formFromSeries(series, occurrence) {
   return {
     title: occurrence?.title ?? series.title,
     notes: occurrence?.notes ?? series.notes ?? '',
+    private: Boolean(series.private),
     date:  occurrence?.date ?? rule.startDate,
     time:  several ? '' : (rule.times[0] ?? ''),
     repeat: {
@@ -77,12 +79,12 @@ export async function createFromForm(form) {
   const rule = ruleFromForm(form);
   if (!rule) {
     const task = await upsertTask({
-      date: form.date, title: form.title, notes: form.notes ?? '',
+      date: form.date, title: form.title, notes: form.notes ?? '', private: Boolean(form.private),
       reminderAt: buildReminderTs(form.date, form.time),
     });
     return { task };
   }
-  const series = await upsertSeries({ title: form.title, notes: form.notes ?? '', rule });
+  const series = await upsertSeries({ title: form.title, notes: form.notes ?? '', private: Boolean(form.private), rule });
   return { series };
 }
 
@@ -94,10 +96,11 @@ export async function editOneTime(task, form) {
   if (!rule) {
     return { task: await upsertTask({
       id: task.id, date: form.date, title: form.title, notes: form.notes ?? '',
+      private: Boolean(form.private),
       reminderAt: buildReminderTs(form.date, form.time),
     }) };
   }
-  const series = await upsertSeries({ title: form.title, notes: form.notes ?? '', rule });
+  const series = await upsertSeries({ title: form.title, notes: form.notes ?? '', private: Boolean(form.private), rule });
   await deleteTask(task.id);
   if (task.done) await carryDone(series, [{ date: form.date, slot: 0 }]);
   return { series };
@@ -151,14 +154,14 @@ async function splitSeries(occurrence, form) {
 
   if (!rule) {
     const task = await upsertTask({
-      date: form.date, title: form.title, notes: form.notes ?? '',
+      date: form.date, title: form.title, notes: form.notes ?? '', private: Boolean(form.private),
       reminderAt: buildReminderTs(form.date, form.time),
       done: done.some(d => d.date === from),
     });
     return { task };
   }
 
-  const series = await upsertSeries({ title: form.title, notes: form.notes ?? '', rule });
+  const series = await upsertSeries({ title: form.title, notes: form.notes ?? '', private: Boolean(form.private), rule });
   await carryDone(series, done);
   return { series };
 }

@@ -116,20 +116,24 @@ describe('accessibility + safety', () => {
   });
 
   it('user name / photo are never parsed as HTML', async () => {
-    await store.dispatch('AUTH_SET', { user: {
-      displayName: '<img src=x onerror="window.__pwned=1">',
-      email:       'a@example.com',
-      photoURL:    'https://example.com/a.png" onerror="window.__pwned=1',
+    await store.dispatch('AUTH_SET', { user: { uid: 'u', email: 'a@example.com' } });
+    await store.dispatch('SOCIAL_SET', { profile: {
+      uid: 'u', code: 'Ab3dE9xQ',
+      name:  '<img src=x onerror="window.__pwned=1">',
+      photo: 'https://example.com/a.png" onerror="window.__pwned=1',   // quote → rejected
     } });
-    const avatar = $('#auth-user-avatar');
-    const imgs   = avatar.querySelectorAll('img');
-    expect(imgs).toHaveLength(1);
-    expect(imgs[0].hasAttribute('onerror')).toBe(false);
-    expect($('#auth-user-name').textContent).toBe('<img src=x onerror="window.__pwned=1">');
+    const avatar = $('#acct-avatar');
+    expect(avatar.querySelector('img')).toBeNull();
+    expect($('#acct-name').textContent).toBe('<img src=x onerror="window.__pwned=1">');
+    expect(avatar.textContent).toBe('<');                      // first letter, as text
 
-    await store.dispatch('AUTH_SET', { user: { displayName: 'Cap', email: 'c@example.com', photoURL: 'javascript:alert(1)' } });
+    await store.dispatch('SOCIAL_SET', { profile: { uid: 'u', code: 'x', name: 'Cap', photo: 'javascript:alert(1)' } });
     expect(avatar.querySelector('img')).toBeNull();          // non-https photo ignored
-    expect(avatar.textContent).toBe('C');                     // falls back to initial
+    expect(avatar.textContent).toBe('C');
+
+    await store.dispatch('SOCIAL_SET', { profile: { uid: 'u', code: 'x', name: 'Cap', photo: 'https://lh3.googleusercontent.com/a/x=s96-c' } });
+    expect(avatar.querySelector('img').getAttribute('src')).toBe('https://lh3.googleusercontent.com/a/x=s96-c');
+    await store.dispatch('SOCIAL_SET', { profile: null });
     await store.dispatch('AUTH_SET', { user: null });
   });
 });

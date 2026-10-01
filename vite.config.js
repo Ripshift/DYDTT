@@ -74,6 +74,7 @@ export default defineConfig({
         'src/auth/authManager.js',  // thin Firebase Auth wrapper — test against the Auth emulator later
         'src/db/seed.js',           // dev-only sample data
         'src/sync/firestoreAdapter.js', // talks to real Firestore — covered by firestore/rules.test.js + manual testing
+        'src/social/socialAdapter.js',  // same, for Friends & Family
       ],
       thresholds: {
         lines:      80,

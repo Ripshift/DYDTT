@@ -3,9 +3,10 @@
  */
 
 import {
-  getLiveTasksForDate, getTask, upsertTask, deleteTask, hardDeleteTask,
-  getWeeklySummary, getSetting, setSetting, clearDay, wipeAll,
+  getTask, upsertTask, deleteTask, hardDeleteTask,
+  getSetting, setSetting, clearDay, wipeAll,
 } from './db/schema.js';
+import { dayTasks, summary, canShowDate, getSharedSource } from './data/source.js';
 import { createFromForm, editOneTime, editOccurrence, removeTask } from './tasks/taskService.js';
 import { getWeekGridDates, todayStr, addDays } from './utils/dateHelpers.js';
 import { applyMotionPref }            from './utils/motionPrefs.js';
@@ -29,6 +30,10 @@ const initialState = {
     selectedTaskId: null,
     syncPending:    false,
   },
+  // Friends & Family (see src/social/)
+  social: { ready: false, profile: null, contacts: [], incoming: [], outgoing: [] },
+  viewing:    null,     // { uid, name, photo, level } while someone else's calendar is open
+  navBlocked: null,     // last refused navigation (outside a friend's shared days)
   // Cloud sync status (see src/sync/)
   sync: {
     status:       'off',     // off | idle | syncing | offline | error
@@ -77,8 +82,13 @@ function createStore(initial) {
         await dispatch('NAV_TO_DATE', { date: addDays(state.currentDate, -1) });
         break;
       case 'NAV_TO_DATE': {
+        // Friends only share yesterday / today / tomorrow
+        if (!canShowDate(payload.date)) {
+          patch('navBlocked', { date: payload.date, at: Date.now() });
+          break;
+        }
         patch('currentDate', payload.date);
-        patch('tasks', await getLiveTasksForDate(payload.date));
+        patch('tasks', await dayTasks(payload.date));
         patchUi({ selectedTaskId: null });
         await dispatch('REFRESH_WEEKLY_SUMMARY');
         break;
@@ -86,8 +96,8 @@ function createStore(initial) {
 
       // Reload the visible day + summary (e.g. after a sync brought changes)
       case 'REFRESH': {
-        patch('tasks', await getLiveTasksForDate(state.currentDate));
-        if (state.ui.selectedTaskId && !state.tasks.some(t => t.id === state.ui.selectedTaskId)) {
+        patch('tasks', await dayTasks(state.currentDate));
+        if (!state.viewing && state.ui.selectedTaskId && !state.tasks.some(t => t.id === state.ui.selectedTaskId)) {
           const sel = await getTask(state.ui.selectedTaskId);
           if (!sel || sel.deleted) patchUi({ selectedTaskId: null });
         }
@@ -147,10 +157,31 @@ function createStore(initial) {
         break;
       }
 
+      // ── Friends & Family ─────────────────────────────────────────────────
+      case 'SOCIAL_SET':
+        patch('social', { ...state.social, ...payload });
+        break;
+
+      // Open (viewing = { uid, name, photo, level }) or close (null) someone's calendar
+      case 'VIEW_SET': {
+        patch('viewing', payload.viewing ?? null);
+        if (typeof document !== 'undefined') {
+          document.documentElement.classList.toggle('shared-mode', Boolean(payload.viewing));
+        }
+        patchUi({ selectedTaskId: null, modalOpen: false });
+        await dispatch('NAV_TO_DATE', { date: todayStr() });
+        break;
+      }
+
       case 'SYNC_STATUS':
         patch('sync', { ...state.sync, ...payload });
         break;
       case 'TASK_TOGGLE': {
+        // Someone else's calendar: only family can tick, and it goes to their account
+        if (state.viewing) {
+          await getSharedSource()?.toggle(payload.id);
+          break;
+        }
         // Look in the DB too — the 48h view shows tasks outside currentDate
         const task = state.tasks.find(t => t.id === payload.id) ?? await getTask(payload.id);
         if (!task) break;
@@ -170,8 +201,7 @@ function createStore(initial) {
       // ── Weekly summary ───────────────────────────────────────────────────
       case 'REFRESH_WEEKLY_SUMMARY': {
         const dates   = getWeekGridDates(state.currentDate);
-        const summary = await getWeeklySummary(dates);
-        patch('weeklySummary', summary);
+        patch('weeklySummary', await summary(dates));
         break;
       }
 
@@ -203,7 +233,7 @@ function createStore(initial) {
     const settings = { ...initial.settings };
     keys.forEach((k, i) => { if (vals[i] !== null) settings[k] = vals[i]; });
     patch('settings', settings);
-    patch('tasks', await getLiveTasksForDate(state.currentDate));
+    patch('tasks', await dayTasks(state.currentDate));
     await dispatch('REFRESH_WEEKLY_SUMMARY');
   }
 

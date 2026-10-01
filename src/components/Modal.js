@@ -12,6 +12,8 @@ import { signInWithGoogle, signInWithEmail,
          signOutUser }                                   from '../auth/authManager.js';
 import EditPanel                                       from './EditPanel.js';
 import { signOutAndClear }                              from '../sync/index.js';
+import AccountPanel                                     from './AccountPanel.js';
+import { setSignupName }                                from '../social/social.js';
 import { requestPermission, getPermissionState }         from '../push/client.js';
 
 const TABS = ['edit', 'settings', 'auth'];
@@ -30,6 +32,7 @@ export default class Modal {
   #isOpen   = false;
   #currentTab = null;
   #edit     = null;
+  #account  = null;
   #handlers = new Map();
   #unsubs   = [];
 
@@ -224,6 +227,11 @@ export default class Modal {
       <div class="auth-divider"><span>or</span></div>
 
       <div id="auth-form-mode-login">
+        <div class="form-group" id="auth-name-group" hidden>
+          <label class="form-label" for="auth-name">Your name</label>
+          <input class="form-input" id="auth-name" type="text" maxlength="50"
+                 placeholder="How friends will see you" autocomplete="name" />
+        </div>
         <div class="form-group">
           <label class="form-label" for="auth-email">Email</label>
           <input class="form-input" id="auth-email" type="email"
@@ -244,22 +252,19 @@ export default class Modal {
         </div>
       </div>`;
 
-    // Logged-in section
-    const logoutSection = document.createElement('div');
+    // Logged-in section: profile, Friends & Family, code, sign out
+    this.#account = new AccountPanel({
+      // Uploads pending changes first, then clears this device (tasks stay in the account)
+      onSignOut: async () => {
+        const done = await signOutAndClear(signOutUser);
+        if (!done) return;
+        announce('Signed out');
+        this.close();
+      },
+    });
+    const logoutSection = this.#account.el;
     logoutSection.id = 'auth-logout-section';
     logoutSection.style.display = 'none';
-    logoutSection.innerHTML = `
-      <div class="auth-user-card" id="auth-user-card">
-        <div class="auth-user-avatar" id="auth-user-avatar"></div>
-        <div class="auth-user-info">
-          <div class="auth-user-name"  id="auth-user-name"></div>
-          <div class="auth-user-email" id="auth-user-email"></div>
-        </div>
-      </div>
-      <p class="settings-hint">Your tasks sync to this account. Signing out removes them from this device; they stay in your account.</p>
-      <button class="btn btn--danger" id="auth-signout-btn" style="width:100%;margin-top:var(--space-5)">
-        Sign out
-      </button>`;
 
     p.append(loginSection, logoutSection);
 
@@ -295,6 +300,7 @@ export default class Modal {
         p.querySelector('#auth-submit-btn').textContent  = isSignUp ? 'Create account' : 'Sign in';
         p.querySelector('#auth-forgot-btn').style.display = isSignUp ? 'none' : 'inline-flex';
         p.querySelector('#auth-password').autocomplete   = isSignUp ? 'new-password' : 'current-password';
+        p.querySelector('#auth-name-group').hidden        = !isSignUp;
         setError('');
       });
 
@@ -303,9 +309,13 @@ export default class Modal {
         const email    = p.querySelector('#auth-email').value.trim();
         const password = p.querySelector('#auth-password').value;
         if (!email || !password) { setError('Please enter your email and password.'); return; }
+        const name = p.querySelector('#auth-name').value.trim();
+        if (isSignUp && !name) { setError('Please enter your name.'); return; }
         setLoading(true); setError('');
-        const fn = isSignUp ? signUpWithEmail : signInWithEmail;
-        const { error } = await fn(email, password);
+        if (isSignUp) setSignupName(name);       // used for the new profile
+        const { error } = isSignUp
+          ? await signUpWithEmail(email, password, name)
+          : await signInWithEmail(email, password);
         if (error) { setError(error); setLoading(false); }
         else        { this.close(); }
       });
@@ -319,14 +329,6 @@ export default class Modal {
         if (!error) announce('Password reset email sent');
       });
 
-      // Sign out
-      // Uploads pending changes first, then clears this device (tasks stay in the account)
-      p.querySelector('#auth-signout-btn').addEventListener('click', async () => {
-        const done = await signOutAndClear(signOutUser);
-        if (!done) return;
-        announce('Signed out');
-        this.close();
-      });
     });
 
     return p;
@@ -340,42 +342,8 @@ export default class Modal {
     const logoutSection = this.#panel?.querySelector('#auth-logout-section');
     if (!loginSection || !logoutSection) return;
 
-    if (user) {
-      loginSection.style.display  = 'none';
-      logoutSection.style.display = 'block';
-
-      const nameEl  = logoutSection.querySelector('#auth-user-name');
-      const emailEl = logoutSection.querySelector('#auth-user-email');
-      const avatarEl = logoutSection.querySelector('#auth-user-avatar');
-
-      if (nameEl)  nameEl.textContent  = user.displayName ?? 'No name set';
-      if (emailEl) emailEl.textContent = user.email ?? '';
-      if (avatarEl) {
-        avatarEl.replaceChildren();
-        avatarEl.removeAttribute('style');
-        // Build the avatar with DOM APIs — never interpolate user data into innerHTML
-        if (user.photoURL && /^https:\/\//i.test(user.photoURL)) {
-          const img = document.createElement('img');
-          img.src    = user.photoURL;
-          img.alt    = user.displayName ?? '';
-          img.width  = 40;
-          img.height = 40;
-          img.referrerPolicy = 'no-referrer';
-          img.style.cssText  = 'border-radius:50%;display:block';
-          avatarEl.appendChild(img);
-        } else {
-          const initials = (user.displayName ?? user.email ?? '?').charAt(0).toUpperCase();
-          avatarEl.textContent = initials;
-          avatarEl.style.cssText = `
-            width:40px;height:40px;border-radius:50%;background:var(--color-gold-400);
-            color:#141414;display:flex;align-items:center;justify-content:center;
-            font-weight:700;font-size:var(--text-base);`;
-        }
-      }
-    } else {
-      loginSection.style.display  = 'block';
-      logoutSection.style.display = 'none';
-    }
+    loginSection.style.display  = user ? 'none'  : 'block';
+    logoutSection.style.display = user ? '' : 'none';     // '' keeps its CSS flex layout
   }
 
   // ── Tab switching ─────────────────────────────────────────────────────────
@@ -421,5 +389,5 @@ export default class Modal {
     return () => this.#handlers.get(event).delete(fn);
   }
   #emit(event)  { this.#handlers.get(event)?.forEach(fn => fn()); }
-  destroy()     { this.#unsubs.forEach(u => u()); this.#edit?.destroy(); }
+  destroy()     { this.#unsubs.forEach(u => u()); this.#edit?.destroy(); this.#account?.destroy(); }
 }

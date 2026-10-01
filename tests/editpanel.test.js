@@ -306,3 +306,38 @@ describe('Dialog', () => {
     expect(await p).toBeNull();
   });
 });
+
+describe('Edit tab — private tasks', () => {
+  it('"Private task" is saved on one-time and repeating tasks and shown with a lock', async () => {
+    await openEdit();
+    $('#modal-new-btn').click();
+    set('#modal-task-title', 'Diary');
+    $('#modal-task-private').checked = true;
+    $('#modal-save-btn').click();
+    await tick(60);
+    const t = store.state.tasks.find(x => x.title === 'Diary');
+    expect(t.private).toBe(true);
+
+    await openEdit();
+    $('#modal-new-btn').click();
+    set('#modal-task-title', 'Therapy');
+    set('#modal-repeat', 'weekly');
+    $('#modal-task-private').checked = true;
+    $('#modal-save-btn').click();
+    await tick(60);
+    const occ = store.state.tasks.find(x => x.title === 'Therapy');
+    expect(occ.private).toBe(true);
+    expect((await getSeries(occ.seriesId)).private).toBe(true);
+
+    // Editing it back: the box is ticked; changing privacy only offers "this and all future"
+    await store.dispatch('TASK_SELECT', { id: occ.id });
+    await openEdit();
+    expect($('#modal-task-private').checked).toBe(true);
+    $('#modal-task-private').checked = false;
+    $('#modal-save-btn').click();
+    await tick();
+    expect(dialogText()).not.toContain('Just this one');
+    await pick('This and all future');
+    expect(store.state.tasks.find(x => x.title === 'Therapy').private).toBe(false);
+  });
+});

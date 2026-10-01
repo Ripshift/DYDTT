@@ -5,7 +5,7 @@
 
 import { store }                                        from '../store.js';
 import { parseDisplayDate, addDays }                    from '../utils/dateHelpers.js';
-import { getTasksForDate, isLive }                              from '../db/schema.js';
+import { dayTasks, canShowDate }                                from '../data/source.js';
 import TaskItem                                          from './TaskItem.js';
 import SwipeController                                   from './SwipeController.js';
 
@@ -56,15 +56,7 @@ export default class FortyEightHourView {
     const d1 = addDays(d0, 1);
     this.#dates = [d0, d1];
 
-    const [tasks0, tasks1] = await Promise.all([
-      getTasksForDate(d0),
-      getTasksForDate(d1),
-    ]);
-
-    const taskSets = [
-      tasks0.filter(isLive),
-      tasks1.filter(isLive),
-    ];
+    const taskSets = await Promise.all([dayTasks(d0), dayTasks(d1)]);
 
     const selectedId = store.state.ui.selectedTaskId;
     [0, 1].forEach(i => this.#renderPanel(i, this.#dates[i], taskSets[i], selectedId));
@@ -122,10 +114,11 @@ export default class FortyEightHourView {
         empty.className = 'task-list--empty';
         const msg = document.createElement('p');
         msg.className = 'task-list__empty-msg';
-        msg.textContent = 'Nothing planned';
         empty.appendChild(msg);
         panel.appendChild(empty);
       }
+      // Friends only share yesterday / today / tomorrow
+      empty.firstChild.textContent = canShowDate(dateStr) ? 'Nothing planned' : 'Not shared';
     } else {
       empty?.remove();
     }

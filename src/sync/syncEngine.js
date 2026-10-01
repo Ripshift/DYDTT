@@ -23,13 +23,14 @@ import {
   getQueuedChanges, removeQueued, queuedCount, queueChange,
   pruneGenerated, clearLocalData,
 } from '../db/schema.js';
-import { occurrenceId } from '../utils/recurrence.js';
+import { occurrenceId, epochDay } from '../utils/recurrence.js';
 
 export const TASK_FIELDS = ['id', 'date', 'title', 'notes', 'done', 'order', 'reminderAt', 'remindedAt',
-  'priority', 'tags', 'createdAt', 'updatedAt', 'deleted', 'seriesId', 'slot'];
-export const SERIES_FIELDS = ['id', 'title', 'notes', 'rule', 'createdAt', 'updatedAt', 'deleted'];
+  'priority', 'tags', 'createdAt', 'updatedAt', 'deleted', 'seriesId', 'slot', 'private', 'day'];
+export const SERIES_FIELDS = ['id', 'title', 'notes', 'rule', 'createdAt', 'updatedAt', 'deleted', 'private'];
 
 const RETRY_MS = 30_000;
+const REMOTE_SCHEMA = 2;
 // Server time of the newest change pulled, per collection
 const PULLED = { task: 'lastPulledAt:task', series: 'lastPulledAt:series' };
 async function resetPulled() {
@@ -47,6 +48,10 @@ export function toRemote(record, fields) {
   if ('title' in out) out.title = String(out.title ?? '').slice(0, 255);
   if ('notes' in out) out.notes = String(out.notes ?? '').slice(0, 5000);
   if (!('deleted' in out)) out.deleted = false;
+  // Friends & Family: viewers can only query docs with private == false, and friends
+  // only within a few days of today (by `day`), so these must always be present.
+  out.private = Boolean(out.private);
+  if (fields.includes('day') && typeof out.date === 'string') out.day = epochDay(out.date);
   return out;
 }
 
@@ -89,9 +94,23 @@ export function createSyncEngine({ adapter, onStatus = () => {}, onRemoteChange 
     uid = newUid;
     setSyncActive(true);
     setStatus({ status: 'idle', error: null });
+    await upgradeRemote();
     await drain();
     listen();
     return true;
+  }
+
+  /**
+   * One-time re-upload when the cloud format gains fields (v2: `private` + `day`,
+   * needed for Friends & Family). Everything on this device is queued once.
+   */
+  async function upgradeRemote() {
+    if ((await getSetting('remoteSchema')) >= REMOTE_SCHEMA) return;
+    const tasks  = (await db.tasks.toArray()).filter(t => !t.generated);
+    const series = await db.series.toArray();
+    for (const s of series) await queueChange('series', s.id);
+    for (const t of tasks)  await queueChange('task', t.id);
+    await setSetting('remoteSchema', REMOTE_SCHEMA);
   }
 
   /** Stop syncing without touching local data (e.g. the session expired). */
@@ -168,6 +187,7 @@ export function createSyncEngine({ adapter, onStatus = () => {}, onRemoteChange 
     }
 
     await setSetting('syncUid', newUid);
+    await setSetting('remoteSchema', REMOTE_SCHEMA);
     await resetPulled();
     setSyncActive(true);
 

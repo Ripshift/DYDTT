@@ -79,6 +79,14 @@ export default class EditPanel {
         <input class="form-input" id="modal-task-notes" type="text"
                placeholder="Optional notes..." autocomplete="off" maxlength="5000" />
       </div>
+      <label class="check-row" for="modal-task-private">
+        <input type="checkbox" id="modal-task-private" />
+        <span class="check-row__box" aria-hidden="true"></span>
+        <span class="check-row__text">
+          <span class="check-row__label">Private task</span>
+          <span class="check-row__hint">Not shared with friends or family</span>
+        </span>
+      </label>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="modal-task-date">Date</label>
@@ -240,6 +248,7 @@ export default class EditPanel {
     return {
       title: v('#modal-task-title').trim(),
       notes: v('#modal-task-notes').trim(),
+      private: this.#q('#modal-task-private').checked,
       date:  v('#modal-task-date') || store.state.currentDate,
       time:  v('#modal-task-reminder'),
       repeat: {
@@ -259,6 +268,7 @@ export default class EditPanel {
     const set = (s, val) => { this.#q(s).value = val ?? ''; };
     set('#modal-task-title', form.title);
     set('#modal-task-notes', form.notes);
+    this.#q('#modal-task-private').checked = Boolean(form.private);
     set('#modal-task-date', form.date);
     set('#modal-task-reminder', form.time);
     const r = form.repeat;
@@ -301,6 +311,7 @@ export default class EditPanel {
     } else if (this.#task) {
       this.#writeForm({
         title: this.#task.title, notes: this.#task.notes ?? '', date: this.#task.date,
+        private: Boolean(this.#task.private),
         time: this.#task.reminderAt ? new Date(this.#task.reminderAt).toTimeString().slice(0, 5) : '',
         repeat: { freq: 'none' },
       });
@@ -336,7 +347,9 @@ export default class EditPanel {
     let scope;
     if (this.#task?.seriesId && this.#series) {
       const newRule  = ruleFromForm(form);
-      const ruleSame = newRule && sameRule({ ...this.#series.rule, startDate: form.date }, newRule);
+      // Changing the repeat pattern or privacy applies to the whole series from here on
+      const ruleSame = newRule && sameRule({ ...this.#series.rule, startDate: form.date }, newRule)
+        && Boolean(form.private) === Boolean(this.#series.private);
       const options  = ruleSame
         ? [{ label: 'Just this one', value: 'this', variant: 'primary' },
            { label: 'This and all future', value: 'future' }]

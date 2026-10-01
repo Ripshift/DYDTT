@@ -54,7 +54,7 @@ export default class TaskItem {
     item.setAttribute('tabindex',     '0');
     item.setAttribute('aria-pressed', String(this.#selected));
     item.setAttribute('aria-label',
-      `${t.title}${t.seriesId ? ' — repeating' : ''}${this.#selected ? ' — selected' : ''}${t.done ? ' — done' : ''}`);
+      `${t.title}${t.private ? ' — private' : ''}${t.seriesId ? ' — repeating' : ''}${this.#selected ? ' — selected' : ''}${t.done ? ' — done' : ''}`);
 
     // ── Checkbox ───────────────────────────────────────────────────────────
     const checkbox = document.createElement('button');
@@ -62,6 +62,12 @@ export default class TaskItem {
     checkbox.setAttribute('role',         'checkbox');
     checkbox.setAttribute('aria-checked', String(t.done));
     checkbox.setAttribute('aria-label',   `Mark "${t.title}" as ${t.done ? 'incomplete' : 'complete'}`);
+    // A friend's calendar is read-only (family can tick)
+    if (store.state.viewing?.level === 'friend') {
+      checkbox.disabled = true;
+      checkbox.setAttribute('aria-disabled', 'true');
+      checkbox.title = 'Only family can tick off tasks';
+    }
     checkbox.addEventListener('click', (e) => {
       e.stopPropagation();
       store.dispatch('TASK_TOGGLE', { id: t.id });
@@ -77,14 +83,14 @@ export default class TaskItem {
     title.textContent = t.title;
     body.appendChild(title);
 
-    const metaParts = [];
-    if (t.seriesId)     metaParts.push('↻');
-    if (t.reminderAt)   metaParts.push(formatTime(t.reminderAt));
-    if (t.tags?.length) metaParts.push(t.tags[0]);
-    if (metaParts.length) {
+    // Icons (🔒 private, ↻ repeating) first, then time · tag
+    const icons = [t.private && '🔒', t.seriesId && '↻'].filter(Boolean).join(' ');
+    const info  = [t.reminderAt && formatTime(t.reminderAt), t.tags?.[0]].filter(Boolean).join(' · ');
+    const metaText = [icons, info].filter(Boolean).join(' ');
+    if (metaText) {
       const meta = document.createElement('div');
       meta.className   = 'task-item__meta';
-      meta.textContent = metaParts.join(' · ').replace(/^↻ · /, '↻ ');
+      meta.textContent = metaText;
       body.appendChild(meta);
     }
 

@@ -49,11 +49,27 @@ describe('burger + modal', () => {
     expect(btn.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('Cancel closes and resets the burger', () => {
+  it('Cancel on a new task goes back to the buttons; Cancel while editing closes', async () => {
     btn.click();
+    $('#modal-new-btn').click();
+    expect($('#modal-edit-form').hidden).toBe(false);
+    $('#modal-cancel-btn').click();
+    expect(isOpen()).toBe(true);
+    expect($('#modal-edit-form').hidden).toBe(true);
+    expect(document.activeElement).toBe($('#modal-new-btn'));
+    btn.click();
+
+    await store.dispatch('TASK_UPSERT', { date: '2026-10-01', title: 'Walk dog' });
+    await store.dispatch('TASK_SELECT', { id: store.state.tasks[0].id });
+    btn.click();
+    await tick();
     $('#modal-cancel-btn').click();
     expect(isOpen()).toBe(false);
     expect(btn.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('third tab is called Account', () => {
+    expect($('#tab-btn-auth').textContent).toBe('Account');
   });
 
   it('Escape closes', () => {

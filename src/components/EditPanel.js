@@ -2,6 +2,11 @@
  * DYDTT — Edit tab
  * Add / edit a task (one-time or repeating), delete or clear tasks, and sync.
  *
+ * Nothing selected → three full-width buttons: New Task · Sync · Clear.
+ *                    "New Task" opens the form.
+ * Task selected    → the form opens straight away, filled in for editing,
+ *                    with Sync · Delete task below.
+ *
  * Repeats: does not repeat · daily · several times a day · weekly ·
  *          every N days · monthly — ending never / on a date / after N times.
  */
@@ -15,6 +20,7 @@ import { announce }                     from '../utils/a11y.js';
 import { showToast }                    from '../utils/toast.js';
 import { choose }                       from './Dialog.js';
 import { syncNow }                      from '../sync/index.js';
+import './TimeField.js';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -34,6 +40,7 @@ export default class EditPanel {
   #onTab;
   #task   = null;     // task being edited (null = new)
   #series = null;     // its series, if repeating
+  #expanded = false;  // form visible?
   #unsubs = [];
 
   constructor({ onClose, onTab }) {
@@ -57,6 +64,10 @@ export default class EditPanel {
     p.setAttribute('role', 'tabpanel');
     p.setAttribute('aria-labelledby', 'tab-btn-edit');
     p.innerHTML = `
+      <button class="btn btn--primary btn--block" id="modal-new-btn" type="button"
+              aria-expanded="false" aria-controls="modal-edit-form">+ New Task</button>
+
+      <div class="edit-form" id="modal-edit-form" hidden>
       <div class="modal-edit-context" id="modal-edit-context" aria-live="polite"></div>
       <div class="form-group">
         <label class="form-label" for="modal-task-title">Task title</label>
@@ -74,8 +85,8 @@ export default class EditPanel {
           <input class="form-input" id="modal-task-date" type="date" />
         </div>
         <div class="form-group" id="modal-time-single">
-          <label class="form-label" for="modal-task-reminder">Reminder time</label>
-          <input class="form-input" id="modal-task-reminder" type="time" />
+          <span class="form-label" id="modal-reminder-label">Reminder time</span>
+          <time-field id="modal-task-reminder" aria-label="Reminder time"></time-field>
         </div>
       </div>
 
@@ -129,17 +140,19 @@ export default class EditPanel {
         <button class="btn btn--secondary" id="modal-cancel-btn">Cancel</button>
         <button class="btn btn--primary"   id="modal-save-btn">Save</button>
       </div>
+      </div>
 
       <div class="edit-actions">
-        <button class="btn btn--ghost text-danger" id="modal-delete-btn">Clear…</button>
-        <div class="edit-actions__sync">
+        <button class="btn btn--secondary btn--block btn--split" id="modal-sync-btn" type="button">
+          <span id="modal-sync-label">Sync</span>
           <span class="sync-status" id="modal-sync-status" aria-live="polite"></span>
-          <button class="btn btn--secondary" id="modal-sync-btn">Sync</button>
-        </div>
+        </button>
+        <button class="btn btn--outline-danger btn--block" id="modal-delete-btn" type="button">Clear…</button>
       </div>`;
 
     const $ = (s) => p.querySelector(s);
-    $('#modal-cancel-btn').addEventListener('click', () => this.#onClose());
+    $('#modal-new-btn').addEventListener('click',    () => this.#openNew());
+    $('#modal-cancel-btn').addEventListener('click', () => this.#cancel());
     $('#modal-save-btn').addEventListener('click',   () => this.save());
     $('#modal-delete-btn').addEventListener('click', () => this.deleteOrClear());
     $('#modal-sync-btn').addEventListener('click',   () => this.#sync());
@@ -159,14 +172,35 @@ export default class EditPanel {
 
   #q(sel) { return this.#el.querySelector(sel); }
 
+  /** Show / hide the form (the New Task button shows when it's hidden). */
+  #setExpanded(on) {
+    this.#expanded = on;
+    this.#q('#modal-edit-form').hidden = !on;
+    this.#q('#modal-new-btn').hidden   = on;
+    this.#q('#modal-new-btn').setAttribute('aria-expanded', String(on));
+  }
+
+  get expanded() { return this.#expanded; }
+
+  #openNew() {
+    this.#setExpanded(true);
+    this.#q('#modal-task-title').focus();
+  }
+
+  /** Cancel: back to the three buttons for a new task; close when editing. */
+  #cancel() {
+    if (this.#task) { this.#onClose(); return; }
+    this.#writeForm({ title: '', notes: '', date: store.state.currentDate, time: '', repeat: { freq: 'none' } });
+    this.#setExpanded(false);
+    this.#q('#modal-new-btn').focus();
+  }
+
   #addTime(value) {
     const wrap = document.createElement('div');
     wrap.className = 'repeat__time';
-    const input = document.createElement('input');
-    input.type = 'time';
-    input.className = 'form-input';
-    input.value = value;
+    const input = document.createElement('time-field');
     input.setAttribute('aria-label', 'Time');
+    input.value = value;
     input.addEventListener('input', () => this.#syncRepeatUi());
     const rm = document.createElement('button');
     rm.type = 'button';
@@ -210,7 +244,7 @@ export default class EditPanel {
       time:  v('#modal-task-reminder'),
       repeat: {
         freq:     v('#modal-repeat'),
-        times:    [...this.#el.querySelectorAll('#modal-times input')].map(i => i.value).filter(Boolean),
+        times:    [...this.#el.querySelectorAll('#modal-times time-field')].map(i => i.value).filter(Boolean),
         weekdays: [...this.#el.querySelectorAll('.weekday[aria-pressed="true"]')].map(b => Number(b.dataset.day)),
         interval: Number(v('#modal-interval')) || 1,
         monthDay: Number(v('#modal-monthday')) || null,
@@ -263,6 +297,7 @@ export default class EditPanel {
       ctx.textContent = `Editing: ${this.#task.title} · ↻ ${describeRule(this.#series.rule)}`;
       ctx.className   = 'modal-edit-context modal-edit-context--editing';
       del.textContent = 'Delete task…';
+      this.#setExpanded(true);
     } else if (this.#task) {
       this.#writeForm({
         title: this.#task.title, notes: this.#task.notes ?? '', date: this.#task.date,
@@ -272,11 +307,13 @@ export default class EditPanel {
       ctx.textContent = `Editing: ${this.#task.title}`;
       ctx.className   = 'modal-edit-context modal-edit-context--editing';
       del.textContent = 'Delete task…';
+      this.#setExpanded(true);
     } else {
       this.#writeForm({ title: '', notes: '', date: store.state.currentDate, time: '', repeat: { freq: 'none' } });
       ctx.textContent = 'New task';
       ctx.className   = 'modal-edit-context modal-edit-context--new';
       del.textContent = 'Clear…';
+      this.#setExpanded(false);
     }
     this.#renderSync();
   }
@@ -401,14 +438,16 @@ export default class EditPanel {
 
   #renderSync() {
     const btn = this.#q('#modal-sync-btn');
+    const lbl = this.#q('#modal-sync-label');
     const txt = this.#q('#modal-sync-status');
     const { user, sync } = store.state;
     if (!user) {
-      btn.textContent = 'Sign in to sync';
+      lbl.textContent = 'Sign in to sync';
       txt.textContent = 'Only on this device';
+      btn.disabled = false;
       return;
     }
-    btn.textContent = 'Sync now';
+    lbl.textContent = 'Sync now';
     btn.disabled = sync.status === 'syncing';
     txt.textContent = syncLabel(sync);
   }

@@ -46,6 +46,36 @@ beforeEach(async () => {
   $ = (s) => app.querySelector(s);
 });
 
+describe('Edit tab — layout', () => {
+  it('nothing selected: New Task, Sync, Clear — form hidden until New Task', async () => {
+    await openEdit();
+    expect($('#modal-new-btn').hidden).toBe(false);
+    expect($('#modal-edit-form').hidden).toBe(true);
+    const order = [...app.querySelectorAll('#tab-panel-edit button')]
+      .filter(b => !b.closest('[hidden]') && !b.hidden).map(b => b.id);
+    expect(order).toEqual(['modal-new-btn', 'modal-sync-btn', 'modal-delete-btn']);
+    $('#modal-new-btn').click();
+    expect($('#modal-edit-form').hidden).toBe(false);
+    expect($('#modal-new-btn').hidden).toBe(true);
+    expect($('#modal-new-btn').getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe($('#modal-task-title'));
+  });
+
+  it('task selected: form opens filled in; reopening with nothing selected collapses again', async () => {
+    await store.dispatch('TASK_SAVE', { form: { title: 'Bins', notes: '', date: D, time: '', repeat: { freq: 'none' } } });
+    await store.dispatch('TASK_SELECT', { id: store.state.tasks[0].id });
+    await openEdit();
+    expect($('#modal-edit-form').hidden).toBe(false);
+    expect($('#modal-new-btn').hidden).toBe(true);
+    expect($('#modal-task-title').value).toBe('Bins');
+    await store.dispatch('MODAL_CLOSE');
+    await store.dispatch('TASK_DESELECT');
+    await openEdit();
+    expect($('#modal-edit-form').hidden).toBe(true);
+    expect($('#modal-task-title').value).toBe('');
+  });
+});
+
 describe('Edit tab — repeat options', () => {
   it('shows only the options for the chosen repeat type, with a summary', async () => {
     await openEdit();
@@ -56,12 +86,12 @@ describe('Edit tab — repeat options', () => {
     expect($('#modal-repeat-summary').textContent).toBe('Every Thu');        // defaults to the date's weekday
     set('#modal-repeat', 'several');
     expect(visible()).toEqual(['several', 'any']);
-    expect(app.querySelectorAll('#modal-times input')).toHaveLength(2);
+    expect(app.querySelectorAll('#modal-times time-field')).toHaveLength(2);
     expect($('#modal-time-single').hidden).toBe(true);
     $('#modal-add-time').click();
-    expect(app.querySelectorAll('#modal-times input')).toHaveLength(3);
+    expect(app.querySelectorAll('#modal-times time-field')).toHaveLength(3);
     app.querySelector('.repeat__remove').click();
-    expect(app.querySelectorAll('#modal-times input')).toHaveLength(2);
+    expect(app.querySelectorAll('#modal-times time-field')).toHaveLength(2);
     set('#modal-repeat', 'interval');
     set('#modal-interval', '3');
     set('#modal-ends', 'count');
@@ -95,7 +125,7 @@ describe('Edit tab — saving', () => {
     await openEdit();
     set('#modal-task-title', 'Meds');
     set('#modal-repeat', 'several');
-    const [a, b] = app.querySelectorAll('#modal-times input');
+    const [a, b] = app.querySelectorAll('#modal-times time-field');
     a.value = '09:00'; b.value = '21:00';
     $('#modal-save-btn').click();
     await tick(60);
@@ -226,9 +256,9 @@ describe('Edit tab — delete / clear', () => {
 });
 
 describe('Edit tab — sync button', () => {
-  it('signed out: "Sign in to sync" goes to the Login tab', async () => {
+  it('signed out: "Sign in to sync" goes to the Account tab', async () => {
     await openEdit();
-    expect($('#modal-sync-btn').textContent).toBe('Sign in to sync');
+    expect($('#modal-sync-label').textContent).toBe('Sign in to sync');
     expect($('#modal-sync-status').textContent).toBe('Only on this device');
     $('#modal-sync-btn').click();
     await tick();
@@ -239,7 +269,7 @@ describe('Edit tab — sync button', () => {
     await store.dispatch('AUTH_SET', { user: { uid: 'u1', email: 'a@b.c' } });
     await store.dispatch('SYNC_STATUS', { status: 'idle', pending: 3 });
     await openEdit();
-    expect($('#modal-sync-btn').textContent).toBe('Sync now');
+    expect($('#modal-sync-label').textContent).toBe('Sync now');
     expect($('#modal-sync-status').textContent).toBe('3 changes waiting');
     await store.dispatch('SYNC_STATUS', { status: 'syncing' });
     expect($('#modal-sync-btn').disabled).toBe(true);

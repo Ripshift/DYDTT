@@ -1,7 +1,8 @@
 /**
  * DYDTT Phase 1 — Modal Component
- * Tab 3 label dynamically switches between "Login" and "Logout"
- * based on Firebase auth state in the store.
+ * Tabs: Edit · Settings · Account.
+ * Account shows sign-in when signed out, the profile + sign-out when signed in
+ * (and will host Friends & Family later).
  */
 
 import { createFocusTrap, announce }                    from '../utils/a11y.js';
@@ -14,6 +15,7 @@ import { signOutAndClear }                              from '../sync/index.js';
 import { requestPermission, getPermissionState }         from '../push/client.js';
 
 const TABS = ['edit', 'settings', 'auth'];
+const TAB_LABELS = { edit: 'Edit', settings: 'Settings', auth: 'Account' };
 
 const VIEWS = [
   { key: 'day',     label: '1 Day',   desc: 'Single day, swipe to navigate' },
@@ -71,9 +73,7 @@ export default class Modal {
       btn.setAttribute('role', 'tab');
       btn.setAttribute('aria-selected', 'false');
       btn.setAttribute('aria-controls', `tab-panel-${id}`);
-      // Default labels — auth tab overridden by #syncAuthTab
-      btn.textContent = id === 'auth' ? 'Login'
-                      : id.charAt(0).toUpperCase() + id.slice(1);
+      btn.textContent = TAB_LABELS[id];
       btn.addEventListener('click', () => store.dispatch('MODAL_OPEN', { tab: id }));
       tabList.appendChild(btn);
     });
@@ -198,7 +198,7 @@ export default class Modal {
     return p;
   }
 
-  // ── Auth panel (Login / Logout) ───────────────────────────────────────────
+  // ── Account panel (sign in / profile + sign out) ─────────────────────────
 
   #buildAuthPanel() {
     const p = document.createElement('div');
@@ -335,10 +335,6 @@ export default class Modal {
   // ── Auth tab sync ─────────────────────────────────────────────────────────
 
   #syncAuthTab(user) {
-    // Update tab label
-    const tabBtn = this.#panel?.querySelector('#tab-btn-auth');
-    if (tabBtn) tabBtn.textContent = user ? 'Logout' : 'Login';
-
     // Update panel content
     const loginSection  = this.#panel?.querySelector('#auth-login-section');
     const logoutSection = this.#panel?.querySelector('#auth-logout-section');

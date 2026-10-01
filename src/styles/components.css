@@ -780,12 +780,70 @@
 /* ── Edit tab: layout, repeat options, actions ──────────────────────────── */
 
 .form-row {
-  display:               grid;
-  grid-template-columns: 1fr 1fr;
-  gap:                   var(--space-3);
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--space-4);
 }
 .form-row > [hidden] { display: none; }
-.form-row:has(> [hidden]) { grid-template-columns: 1fr; }
+
+/* ── <time-field>: hour : minute + gold AM / PM ─────────────────────────── */
+
+.time-field {
+  display:     flex;
+  align-items: center;
+  gap:         var(--space-2);
+  flex-wrap:   nowrap;
+}
+.time-field select.form-input {
+  width:        4.25rem;
+  padding:      var(--space-3) var(--space-2);
+  text-align:   center;
+  color-scheme: dark;
+  accent-color: var(--color-gold-400);
+}
+.time-field--empty select.form-input { color: var(--color-text-secondary); }
+.time-field__colon { color: var(--color-text-secondary); font-weight: 600; }
+
+.time-field__periods {
+  display:       inline-flex;
+  border:        1px solid var(--color-border-mid);
+  border-radius: var(--radius-md);
+  overflow:      hidden;
+  margin-left:   var(--space-1);
+}
+.time-field__period {
+  min-width:      48px;
+  min-height:     44px;
+  padding:        0 var(--space-3);
+  background:     transparent;
+  color:          var(--color-text-secondary);
+  font-size:      var(--text-sm);
+  font-weight:    600;
+  letter-spacing: var(--tracking-wide);
+  transition:     background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+.time-field__period + .time-field__period { border-left: 1px solid var(--color-border-mid); }
+.time-field__period:hover { color: var(--color-text-primary); background: var(--color-bg-raised); }
+.time-field__period[aria-pressed="true"] {
+  background: var(--color-gold-400);
+  color:      #141414;
+}
+.time-field__period:focus-visible { outline: 2px solid var(--color-gold-300); outline-offset: -2px; }
+
+.time-field__clear {
+  min-width:  36px;
+  min-height: 36px;
+  margin-left: auto;
+  border-radius: var(--radius-full);
+  color:      var(--color-text-secondary);
+  font-size:  var(--text-lg);
+  background: transparent;
+}
+.time-field__clear:hover { color: var(--color-text-primary); background: var(--color-bg-raised); }
+.time-field__clear[hidden] { display: none; }
+
+/* Several-times-a-day rows: time field + remove button */
+.repeat__time time-field { flex: 1; }
 
 .form-input--num  { width: 5rem; padding-inline: var(--space-3); }
 .form-input--auto { width: auto; }
@@ -842,17 +900,68 @@ select.form-input { appearance: auto; }
   min-height: 1em;
 }
 
+/* Sync above Clear/Delete, both full width */
 .edit-actions {
-  display:         flex;
-  align-items:     center;
-  justify-content: space-between;
-  gap:             var(--space-3);
-  flex-wrap:       wrap;
-  padding-top:     var(--space-3);
-  border-top:      1px solid var(--color-border-subtle);
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--space-2);
+  padding-top:    var(--space-3);
+  border-top:     1px solid var(--color-border-subtle);
 }
-.edit-actions__sync { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; }
-.sync-status { font-size: var(--text-xs); color: var(--color-text-secondary); }
+.edit-form[hidden] + .edit-actions,
+.btn--block + .edit-actions { border-top: 0; padding-top: 0; }
+
+.edit-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.edit-form[hidden] { display: none; }
+
+.btn--block { width: 100%; }
+.btn--block[hidden] { display: none; }
+.btn--split { justify-content: space-between; }
+.sync-status { font-size: var(--text-xs); color: var(--color-text-secondary); font-weight: 400; letter-spacing: 0; }
+
+.btn--outline-danger {
+  background: transparent;
+  color:      var(--color-danger);
+  border:     1px solid var(--color-danger);
+}
+.btn--outline-danger:hover { background: rgba(192, 57, 43, 0.12); }
+
+.btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ── Date / time inputs: dark native pickers, gold selections ───────────── */
+
+input[type="time"],
+input[type="date"] {
+  color-scheme: dark;
+  accent-color: var(--color-gold-400);
+}
+
+/* Empty value placeholder ("--:-- --") and the AM/PM part */
+input[type="time"]::-webkit-datetime-edit-ampm-field {
+  color:       var(--color-gold-400);
+  font-weight: 600;
+}
+
+/* The segment being edited (hour, minute, AM/PM, day…) */
+input::-webkit-datetime-edit-hour-field:focus,
+input::-webkit-datetime-edit-minute-field:focus,
+input::-webkit-datetime-edit-ampm-field:focus,
+input::-webkit-datetime-edit-month-field:focus,
+input::-webkit-datetime-edit-day-field:focus,
+input::-webkit-datetime-edit-year-field:focus {
+  background:    var(--color-gold-400);
+  color:         #141414;
+  border-radius: 3px;
+  outline:       none;
+}
+
+/* Clock / calendar icon in gold */
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter:  invert(72%) sepia(43%) saturate(523%) hue-rotate(5deg) brightness(92%) contrast(88%);
+  opacity: 0.9;
+  cursor:  pointer;
+}
 
 /* ── Choice dialog ──────────────────────────────────────────────────────── */
 
@@ -890,3 +999,4 @@ select.form-input { appearance: auto; }
 .dialog__actions .btn { width: 100%; justify-content: space-between; }
 .dialog__cancel  { justify-content: center !important; }
 .dialog__hint    { font-size: var(--text-xs); opacity: 0.7; font-weight: 400; }
+.repeat__time .time-field__clear { display: none; }   /* the row has its own remove button */

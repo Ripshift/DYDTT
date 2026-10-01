@@ -8,7 +8,7 @@ export default {
   parameters: {
     docs: {
       description: {
-        component: 'Three-tab modal: Edit / Settings / Logout. ' +
+        component: 'Three-tab modal: Edit / Settings / Account. ' +
                    'Focus-trapped. Closes on Escape. Driven by store UI state.',
       },
     },
@@ -36,7 +36,7 @@ function buildOverlay(activeTab = 'edit') {
   tabList.className = 'modal-tabs';
   tabList.setAttribute('role', 'tablist');
 
-  ['edit', 'settings', 'logout'].forEach(id => {
+  ['edit', 'settings', 'account'].forEach(id => {
     const btn = document.createElement('button');
     btn.className = `modal-tab${id === activeTab ? ' active' : ''}`;
     btn.setAttribute('role', 'tab');
@@ -99,13 +99,13 @@ function buildOverlay(activeTab = 'edit') {
     </div>`;
   panel.appendChild(settings);
 
-  // Logout panel
+  // Account panel (signed in)
   const logout = document.createElement('div');
-  logout.className = `modal-tab-panel${activeTab === 'logout' ? ' active' : ''}`;
-  logout.id = 'tab-panel-logout-s';
+  logout.className = `modal-tab-panel${activeTab === 'account' ? ' active' : ''}`;
+  logout.id = 'tab-panel-account-s';
   logout.innerHTML = `
     <p style="color:var(--color-text-secondary);margin-bottom:var(--space-6);line-height:1.6">
-      Signing out clears your local session. Tasks remain on this device.
+      Your tasks sync to this account. Signing out removes them from this device; they stay in your account.
     </p>
     <button class="btn btn--danger" style="width:100%">Sign out</button>`;
   panel.appendChild(logout);
@@ -124,7 +124,7 @@ export const SettingsTab = {
   render: () => buildOverlay('settings'),
 };
 
-export const LogoutTab = {
-  name: 'Logout tab',
-  render: () => buildOverlay('logout'),
+export const AccountTab = {
+  name: 'Account tab',
+  render: () => buildOverlay('account'),
 };

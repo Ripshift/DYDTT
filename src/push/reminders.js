@@ -16,10 +16,11 @@
 import { store }             from '../store.js';
 import { getTask, getTasksWithRemindersBetween, ensureOccurrences, isLive,
          markReminderShown, wasReminderShown } from '../db/schema.js';
-import { sendLocalNotification, getPermissionState } from './client.js';
+import { sendLocalNotification, getPermissionState, nativePermissionKnown } from './client.js';
 import { formatTime, todayStr, addDays } from '../utils/dateHelpers.js';
 import { showToast }         from '../utils/toast.js';
 import { announce }          from '../utils/a11y.js';
+import { isNative }          from '../platform.js';
 
 export const HORIZON_MS  = 24 * 60 * 60 * 1000;   // schedule timers up to 24h ahead
 export const CATCH_UP_MS = 12 * 60 * 60 * 1000;   // show missed reminders up to 12h old
@@ -53,6 +54,9 @@ async function plan() {
   timers.forEach(clearTimeout);
   timers.clear();
 
+  // Android app: hand the next week of reminders to the OS instead
+  if (isNative()) return planNative();
+
   // Make sure repeating tasks have their copies for the reminder window
   const today = todayStr();
   for (const d of [addDays(today, -1), today, addDays(today, 1)]) await ensureOccurrences(d);
@@ -72,6 +76,18 @@ async function plan() {
       }, delay));
     }
   }
+}
+
+/** Android: keep the OS alarms in step with the next HORIZON_DAYS of reminders. */
+async function planNative() {
+  if (!nativePermissionKnown()) return;        // app still starting — initNative re-plans when ready
+  const { syncNativeReminders, HORIZON_DAYS } = await import('../native/notifications.js');
+  const today = todayStr();
+  for (let i = 0; i <= HORIZON_DAYS; i++) await ensureOccurrences(addDays(today, i));
+  const now   = Date.now();
+  const tasks = await getTasksWithRemindersBetween(now, now + (HORIZON_DAYS + 1) * 86_400_000);
+  const enabled = Boolean(store.state.settings.pushEnabled) && getPermissionState() === 'granted';
+  await syncNativeReminders(tasks, { enabled, now });
 }
 
 /** Re-check the task (it may have been edited/completed) and show the reminder once. */
@@ -127,6 +143,11 @@ export function initReminders() {
 
   // Any task change (add / edit / complete / delete) → re-plan
   cleanups.push(store.subscribe('tasks', () => scheduleReminders()));
+  // Reminder notifications turned on / off
+  let lastPush = store.state.settings.pushEnabled;
+  cleanups.push(store.subscribe('settings', (s) => {
+    if (s.pushEnabled !== lastPush) { lastPush = s.pushEnabled; scheduleReminders(); }
+  }));
 
   // Roll the 24h window forward
   const interval = setInterval(scheduleReminders, REFRESH_MS);

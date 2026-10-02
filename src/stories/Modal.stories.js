@@ -8,7 +8,7 @@ export default {
   parameters: {
     docs: {
       description: {
-        component: 'Three-tab modal: Edit / Settings / Account. ' +
+        component: 'Three-tab modal: Edit / Display / Account. ' +
                    'Focus-trapped. Closes on Escape. Driven by store UI state.',
       },
     },
@@ -43,7 +43,7 @@ function buildOverlay(activeTab = 'edit') {
     btn.setAttribute('aria-selected', String(id === activeTab));
     btn.setAttribute('aria-controls', `tab-panel-${id}-s`);
     btn.id = `tab-btn-${id}-s`;
-    btn.textContent = id.charAt(0).toUpperCase() + id.slice(1);
+    btn.textContent = { edit: 'Edit', settings: 'Display', account: 'Account' }[id];
     btn.addEventListener('click', () => {
       overlay.querySelectorAll('.modal-tab').forEach(b => {
         b.classList.remove('active');
@@ -120,7 +120,7 @@ export const EditTab = {
 };
 
 export const SettingsTab = {
-  name: 'Settings tab',
+  name: 'Display tab',
   render: () => buildOverlay('settings'),
 };
 

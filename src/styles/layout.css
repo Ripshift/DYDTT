@@ -8,7 +8,9 @@
 #app {
   display:        flex;
   flex-direction: column;
-  min-height:     100dvh;
+  /* Exactly one screen tall: views scroll inside their own zones, so the
+     top bar (and the 9-day grid / 48-hour headers) never scroll away */
+  height:         100dvh;
   max-width:      600px;
   margin:         0 auto;
   position:       relative;
@@ -24,7 +26,8 @@
   display:          flex;
   align-items:      center;
   justify-content:  flex-end;
-  padding:          env(safe-area-inset-top, var(--space-3))
+  /* Below the phone's status bar (Android app draws edge-to-edge) */
+  padding:          max(var(--space-3), env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px))
                     var(--space-4)
                     var(--space-3);
   background:       var(--color-bg-base);
@@ -35,9 +38,12 @@
 
 main {
   flex:       1;
+  min-height: 0;
   display:    flex;
   flex-direction: column;
   overflow:   hidden;
+  /* Clear the phone's gesture/navigation bar (Android app) */
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
 }
 
 /* ── Swipe container ────────────────────────────────────────────────────── */

@@ -60,7 +60,8 @@
   background:    var(--color-bg-surface);
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
   border-top:    1px solid var(--color-border-subtle);
-  padding:       var(--space-6) var(--space-5) var(--space-8);
+  padding:       var(--space-6) var(--space-5)
+                 calc(var(--space-8) + max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px)));
   display:       flex;
   flex-direction: column;
   gap:           var(--space-5);
@@ -580,35 +581,51 @@
 }
 
 /* ── FortyEightHourView ─────────────────────────────────────────────────── */
+/* Two fixed halves, one per day. Each day's header stays put and its tasks
+   scroll on their own. */
 
 .fhv {
   display:        flex;
   flex-direction: column;
   flex:           1;
-  overflow-y:     auto;
+  min-height:     0;
+  overflow:       hidden;
   touch-action:   pan-y;
 }
 
 .fhv__panel {
-  padding:       var(--space-4) var(--space-4) var(--space-6);
-  border-bottom: 1px solid var(--color-border-subtle);
-  display:       flex;
+  flex:           1 1 0;
+  min-height:     0;
+  padding:        var(--space-3) var(--space-4) 0;
+  border-bottom:  1px solid var(--color-border-subtle);
+  display:        flex;
   flex-direction: column;
-  gap:           var(--space-3);
+  gap:            var(--space-3);
 }
 
 .fhv__panel:last-child { border-bottom: none; }
+.fhv__panel .day-header { flex-shrink: 0; padding-bottom: var(--space-2); margin-bottom: 0; }
+.fhv__panel .task-list,
+.fhv__panel .task-list--empty {
+  flex:                1 1 auto;
+  min-height:          0;
+  overflow-y:          auto;
+  overscroll-behavior: contain;
+  padding-bottom:      var(--space-3);
+}
 
 .day-header__date--sm { font-size: var(--text-2xl); }
 
 /* ── WeekGridView ───────────────────────────────────────────────────────── */
+/* The 3×3 grid stays put; only the selected day's tasks scroll. */
 
 .wgv {
   display:        flex;
   flex-direction: column;
   flex:           1;
-  overflow-y:     auto;
-  padding:        var(--space-4);
+  min-height:     0;
+  overflow:       hidden;
+  padding:        var(--space-4) var(--space-4) 0;
   gap:            var(--space-4);
 }
 
@@ -616,6 +633,7 @@
   display:         flex;
   align-items:     center;
   justify-content: space-between;
+  flex-shrink:     0;
 }
 
 .wgv__title {
@@ -626,7 +644,7 @@
   color:          var(--color-text-secondary);
 }
 
-.wgv__grid { margin: 0; }
+.wgv__grid { margin: 0; flex-shrink: 0; }
 
 /* Selected cell in WeekGridView */
 .week-cell.selected {
@@ -641,14 +659,24 @@
 .wgv__tasks {
   display:        flex;
   flex-direction: column;
+  flex:           1 1 auto;
+  min-height:     0;
   gap:            var(--space-3);
-  padding-bottom: var(--space-20);
+}
+.wgv__tasks .task-list,
+.wgv__tasks .task-list--empty {
+  flex:                1 1 auto;
+  min-height:          0;
+  overflow-y:          auto;
+  overscroll-behavior: contain;
+  padding-bottom:      var(--space-6);
 }
 
 .wgv__day-header {
   display:         flex;
   align-items:     baseline;
   justify-content: space-between;
+  flex-shrink:     0;
   padding-bottom:  var(--space-3);
   border-bottom:   1px solid var(--color-border-subtle);
 }
@@ -670,6 +698,7 @@
   display:        flex;
   flex-direction: column;
   flex:           1;
+  min-height:     0;
   overflow:       hidden;
 }
 
@@ -1171,3 +1200,535 @@ html.shared-mode {
 .check-row__label { font-size: var(--text-sm); color: var(--color-text-primary); }
 .check-row__hint  { font-size: var(--text-xs); color: var(--color-text-secondary); }
 
+
+/* ── Mascot: pixel cat dozing on the top bar's line ────────────────────── */
+
+.mascot {
+  position:    absolute;
+  left:        var(--space-4);
+  bottom:      0;                /* lies right on the border-bottom line */
+  line-height: 0;
+  cursor:      pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.mascot svg { display: block; image-rendering: pixelated; }
+
+/* Tap: a heart (or, later, a fish) drifts up from his head.
+   The tail swish is paced in Mascot.js. */
+.mascot__float {
+  position:       absolute;
+  bottom:         calc(var(--mascot-px, 2px) * 13);
+  pointer-events: none;
+  animation:      mascot-float 1.6s ease-out both;
+}
+@keyframes mascot-float {
+  0%   { opacity: 0; transform: translate(0, 4px); }
+  15%  { opacity: 1; transform: translate(0, 0); }
+  45%  { transform: translate(-2px, -10px); }
+  75%  { opacity: 1; transform: translate(2px, -18px); }
+  100% { opacity: 0; transform: translate(0, -26px); }
+}
+
+/* In his room, hearts start above where the "Purr" bubble sits, so they never overlap */
+.mascot--big .mascot__float { bottom: calc(var(--mascot-px, 2px) * 15 + 30px); }
+
+/* "Purr" speech bubble — pixel-style */
+.mascot__bubble {
+  position:       absolute;
+  bottom:         calc(var(--mascot-px, 2px) * 15);
+  transform:      translateX(-50%);
+  padding:        2px 6px;
+  background:     #F8F1E4;
+  color:          #3B200C;
+  border:         2px solid #3B200C;
+  border-radius:  2px;
+  box-shadow:     2px 2px 0 rgba(0, 0, 0, 0.35);
+  font:           700 11px/1.2 ui-monospace, 'Courier New', monospace;
+  letter-spacing: 0.04em;
+  white-space:    nowrap;
+  pointer-events: none;
+  animation:      mascot-bubble 1.6s ease-out both;
+}
+.mascot__bubble::after {           /* little tail pointing at his head */
+  content:    '';
+  position:   absolute;
+  left:       calc(50% - 3px);
+  bottom:     -6px;
+  width:      6px;
+  height:     4px;
+  background: #3B200C;
+  clip-path:  polygon(0 0, 100% 0, 50% 100%);
+}
+@keyframes mascot-bubble {
+  0%   { opacity: 0; transform: translate(-50%, 4px); }
+  12%  { opacity: 1; transform: translate(-50%, 0); }
+  85%  { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -4px); }
+}
+
+/* Big cat on the secret page */
+.mascot--big {
+  position: relative;
+  left:     auto;
+  bottom:   auto;
+}
+
+/* Someone else's calendar: their name sits on the left instead */
+html.shared-mode .mascot { display: none; }
+
+/* Reduced motion: things just appear for a moment, no drifting */
+html.reduce-motion .mascot__float,
+html.reduce-motion .mascot__bubble { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .mascot__float, .mascot__bubble { animation: none; }
+}
+
+/* ── Food bowl next to the top-bar cat (opens the cat game) ──────────────── */
+
+.pet-bowl {
+  position:        absolute;
+  left:            calc(var(--space-4) + 66px);   /* just right of his paws */
+  bottom:          0;
+  width:           36px;
+  height:          36px;
+  display:         flex;
+  align-items:     flex-end;
+  justify-content: center;
+  padding:         0;
+  background:      transparent;
+  line-height:     0;
+  -webkit-tap-highlight-color: transparent;
+}
+.pet-bowl[hidden] { display: none; }
+.pet-bowl svg { display: block; image-rendering: pixelated; }
+.pet-bowl:focus-visible { outline: 2px solid var(--color-gold-400); outline-offset: 2px; border-radius: 4px; }
+.pet-bowl__coin {
+  position:  absolute;
+  bottom:    14px;
+  animation: mascot-float 1.6s ease-out both;
+}
+html.shared-mode .pet-bowl { display: none; }
+
+/* ── Secret page: the cat game (Android app) ────────────────────────────── */
+/* Only gold, silver, grey and black on deep, deep purple. */
+
+.secret-page {
+  --room-bg:     #150A22;
+  --room-floor:  #1E0F31;
+  --room-line:   #2C1A44;
+  --room-gold:   #C9A84C;
+  --room-gold-l: #F0DC8C;
+  --room-silver: #C0C6CF;
+  --room-grey:   #7A7F88;
+  --room-dark:   #3A3442;
+
+  position:        fixed;
+  inset:           0;
+  z-index:         var(--z-tooltip);
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  gap:             var(--space-3);
+  overflow-y:      auto;
+  padding:         max(var(--space-3), env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px))
+                   var(--space-4)
+                   max(var(--space-6), env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  background:      var(--room-bg);
+  color:           var(--room-silver);
+  text-align:      center;
+  opacity:         0;
+  transition:      opacity var(--duration-base) var(--ease-out);
+}
+.secret-page--in { opacity: 1; }
+.secret-page svg { display: block; image-rendering: pixelated; }
+.secret-page button { -webkit-tap-highlight-color: transparent; color: inherit; }
+.secret-page button:focus-visible { outline: 2px solid var(--room-gold); outline-offset: 2px; }
+
+/* Header */
+.pet-header {
+  display:               grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items:           center;
+  width:                 min(100%, 380px);
+  min-height:            44px;
+}
+.pet-header__left { display: flex; align-items: center; gap: var(--space-2); }
+.secret-page__title {
+  font:           700 20px/44px ui-monospace, 'Courier New', monospace;
+  letter-spacing: 0.04em;
+  color:          var(--room-gold);
+}
+.secret-page__close {
+  justify-self:  end;
+  width:         44px;
+  height:        44px;
+  border-radius: var(--radius-md);
+  font-size:     28px;
+  line-height:   1;
+  color:         var(--room-silver);
+}
+.secret-page__close:hover { background: rgba(201, 168, 76, 0.12); }
+
+.pet-burger {
+  display:         flex;
+  flex-direction:  column;
+  justify-content: space-between;
+  width:           44px;
+  height:          44px;
+  padding:         13px 11px;
+  border-radius:   var(--radius-md);
+}
+.pet-burger span {
+  display:    block;
+  height:     3px;
+  background: var(--room-gold);
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast);
+}
+.pet-burger.is-open span:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
+.pet-burger.is-open span:nth-child(2) { opacity: 0; }
+.pet-burger.is-open span:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
+
+.pet-coins {
+  display:     flex;
+  align-items: center;
+  gap:         6px;
+  font:        700 14px ui-monospace, 'Courier New', monospace;
+  color:       var(--room-gold-l);
+}
+.pet-coins.is-bump { animation: pet-bump 0.5s var(--ease-out); }
+@keyframes pet-bump { 40% { transform: scale(1.25); } }
+
+/* Toy box (burger menu) */
+.pet-toybox {
+  position:      absolute;
+  z-index:       2;
+  top:           calc(max(var(--space-3), env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px)) + 52px);
+  left:          50%;
+  transform:     translateX(-50%);
+  width:         min(calc(100% - 2 * var(--space-4)), 380px);
+  box-shadow:    0 12px 32px rgba(0, 0, 0, 0.55);
+  padding:       var(--space-3);
+  border:        2px solid var(--room-line);
+  border-radius: var(--radius-md);
+  background:    #1B0D2B;
+  animation:     pet-drop var(--duration-base) var(--ease-out);
+}
+.pet-toybox[hidden] { display: none; }
+@keyframes pet-drop { from { opacity: 0; transform: translate(-50%, -8px); } }
+.pet-toybox__title {
+  font:  700 16px ui-monospace, 'Courier New', monospace;
+  color: var(--room-gold);
+}
+.pet-toybox__note { margin: 4px 0 var(--space-3); font-size: 12px; color: var(--room-grey); }
+.pet-toybox__say  { min-height: 1.4em; margin-top: var(--space-2); font-size: 13px; color: var(--room-gold-l); }
+.pet-toybox__grid {
+  display:               grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:                   var(--space-2);
+}
+.pet-slot {
+  display:        flex;
+  flex-direction: column;
+  align-items:    center;
+  gap:            4px;
+  padding:        var(--space-2) 4px;
+  border:         2px dashed var(--room-line);
+  border-radius:  var(--radius-md);
+  background:     var(--room-bg);
+}
+.pet-slot.is-owned { border-style: solid; border-color: rgba(201, 168, 76, 0.45); }
+.pet-slot__art {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  height:          56px;
+}
+.pet-slot__name { font: 700 12px ui-monospace, 'Courier New', monospace; color: var(--room-silver); }
+.pet-slot__info { font-size: 10px; line-height: 1.3; color: var(--room-grey); min-height: 2.6em; }
+.pet-slot__price {
+  display:     flex;
+  align-items: center;
+  gap:         4px;
+  font:        700 12px ui-monospace, 'Courier New', monospace;
+  color:       var(--room-grey);
+}
+.pet-slot.is-affordable .pet-slot__price { color: var(--room-gold-l); }
+.pet-slot.is-owned:not([data-item="treats"]) .pet-slot__price { visibility: hidden; }
+.pet-slot.is-new { animation: pet-bump 0.5s var(--ease-out); }
+
+/* The room grows to fill the screen (buttons sit at the bottom). Things on the back
+   line stand on the floor's edge; toys lie on the floor in front. Positions are
+   measured from the centre so the room stays balanced on wider phones. */
+.pet-room {
+  --floor: 40%;            /* floor depth, as a share of the room's height */
+
+  position:      relative;
+  flex:          1 0 auto;
+  width:         min(100%, 380px);
+  min-height:    330px;
+  overflow:      hidden;
+  border-bottom: 2px solid var(--room-line);
+  background:
+    linear-gradient(to top, var(--room-floor) 0 var(--floor),
+                            var(--room-line) var(--floor) calc(var(--floor) + 2px),
+                            var(--room-bg) calc(var(--floor) + 2px));
+}
+.pet-room > * { position: absolute; }
+.pet-room button { padding: 0; background: transparent; line-height: 0; }
+
+/* On the wall */
+/* Taller window grows upwards: its bottom edge stays where it was */
+.pet-room__window      { left: calc(50% - 24px); top: max(4px, calc(6% - 24px)); line-height: 0; }
+
+/* Against the wall, standing on the floor's back edge.
+   The hooded litter box is cut off by the room's left edge on purpose. */
+.pet-room__litter      { left: -10px; bottom: calc(var(--floor) - 2px); }
+.pet-room__stink       { left: 4px;   bottom: calc(var(--floor) + 110px); pointer-events: none; animation: pet-stink 2.4s ease-in-out infinite; }
+.pet-room__scratcher   { left: 96px;  bottom: calc(var(--floor) - 2px); transform-origin: bottom center; }
+.pet-room .mascot--big { left: 179px; bottom: calc(var(--floor) - 2px); }
+
+/* On the floor: back row, then front row */
+.pet-room__bowls        { right: 12px; bottom: calc(var(--floor) * 0.56 + 32px); display: flex; gap: 6px; align-items: flex-end; }
+.pet-room__mice         { left: 110px;  bottom: calc(var(--floor) * 0.58); display: flex; }
+.pet-room__toy--mouse   { left: 16px;            bottom: calc(var(--floor) * 0.1 + 32px); }
+.pet-room__toy--feather { left: calc(50% - 64px); bottom: calc(var(--floor) * 0.08); }
+.pet-room__toy--ball    { left: calc(50% + 18px); bottom: calc(var(--floor) * 0.12 + 8px); }
+.pet-room__toy--spring  { right: 14px;           bottom: calc(var(--floor) * 0.1); }
+.pet-room__toy[hidden]  { display: none; }
+.pet-mouse { margin-left: calc(var(--i) * -10px); padding: 4px 0 !important; }
+
+/* Food bowl alone sits a touch lower and further right than the water bowl */
+.pet-room__food { position: relative; top: 8px; left: 4px; }
+
+/* Water ripples and glints: the second frame blinks over the first */
+.pet-room__water   { position: relative; display: block; line-height: 0; }
+.pet-room__water-b { position: absolute; left: 0; top: 0; animation: pet-ripple 1.8s steps(1) infinite; }
+@keyframes pet-ripple { 0% { opacity: 1; } 50% { opacity: 0; } }
+
+/* Stink rising off a dirty litter box */
+@keyframes pet-stink {
+  0%   { opacity: 0;   transform: translateY(8px); }
+  30%  { opacity: 0.9; }
+  100% { opacity: 0;   transform: translateY(-14px); }
+}
+
+/* String wand dangling its lure in front of his face while you play */
+.pet-room__wand { left: 203px; bottom: calc(var(--floor) + 56px); opacity: 0; pointer-events: none; transform-origin: 100% 100%; }
+
+.pet-room__toy.is-playing      { animation: pet-toy-bounce 1.2s var(--ease-out); }
+.pet-room__scratcher.is-scratching { animation: pet-wobble 0.9s ease-in-out; }
+.pet-room__wand.is-swinging    { animation: pet-swing 1.4s ease-in-out; }
+@keyframes pet-toy-bounce {
+  0%, 100% { transform: translateY(0); }
+  20%      { transform: translateY(-22px) rotate(-12deg); }
+  40%      { transform: translateY(0); }
+  60%      { transform: translateY(-10px) rotate(8deg); }
+  80%      { transform: translateY(0); }
+}
+@keyframes pet-wobble {
+  0%, 100% { transform: rotate(0); }
+  20%, 60% { transform: rotate(-3deg); }
+  40%, 80% { transform: rotate(3deg); }
+}
+@keyframes pet-swing {
+  0%   { opacity: 0; transform: rotate(-20deg); }
+  15%  { opacity: 1; }
+  35%  { transform: rotate(18deg); }
+  55%  { transform: rotate(-14deg); }
+  75%  { transform: rotate(10deg); opacity: 1; }
+  100% { opacity: 0; transform: rotate(0); }
+}
+
+.pet-status {
+  min-height:  3em;
+  max-width:   32ch;
+  color:       var(--room-silver);
+  line-height: 1.5;
+}
+
+.pet-meters {
+  display:               grid;
+  grid-template-columns: repeat(2, auto);
+  gap:                   var(--space-2) var(--space-5);
+}
+.pet-meter { display: flex; align-items: center; gap: var(--space-2); }
+.pet-meter__label {
+  width:      3.4em;
+  text-align: left;
+  font:       700 12px ui-monospace, 'Courier New', monospace;
+  color:      var(--room-grey);
+}
+.pet-meter__bar { display: flex; gap: 2px; }
+.pet-meter__cell { width: 8px; height: 10px; background: var(--room-line); }
+.pet-meter__bar[data-level="high"] .is-on { background: var(--room-gold); }
+.pet-meter__bar[data-level="mid"]  .is-on { background: var(--room-silver); }
+.pet-meter__bar[data-level="low"]  .is-on { background: var(--room-grey); }
+.pet-meter--love .pet-meter__bar .is-on { background: #E5484D; }   /* love is red */
+.pet-meter__bar[data-level="low"] { animation: pet-blink 1.6s steps(1) infinite; }
+@keyframes pet-blink { 50% { opacity: 0.45; } }
+
+.pet-actions {
+  display:               grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap:                   var(--space-2);
+  width:                 min(100%, 380px);
+  margin-top:            var(--space-2);
+}
+.pet-action {
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  justify-content: flex-end;
+  gap:             6px;
+  min-height:      64px;
+  padding:         var(--space-2) 2px;
+  border:          2px solid var(--room-line);
+  border-radius:   var(--radius-md);
+  background:      #1B0D2B;
+  color:           var(--room-silver);
+}
+.pet-action:active { border-color: var(--room-gold); }
+.pet-action.is-empty { opacity: 0.5; }
+.pet-action__label { font: 700 11px ui-monospace, 'Courier New', monospace; }
+
+html.reduce-motion .pet-room__toy.is-playing,
+html.reduce-motion .pet-room__scratcher.is-scratching,
+html.reduce-motion .pet-meter__bar[data-level="low"],
+html.reduce-motion .pet-toybox,
+html.reduce-motion .pet-room__water-b { animation: none; }
+html.reduce-motion .pet-room__stink { animation: none; opacity: 0.8; }
+html.reduce-motion .pet-room__wand.is-swinging { animation: none; opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .pet-room__toy.is-playing, .pet-room__scratcher.is-scratching,
+  .pet-meter__bar[data-level="low"], .pet-toybox, .pet-room__water-b { animation: none; }
+  .pet-room__stink { animation: none; opacity: 0.8; }
+  .pet-room__wand.is-swinging { animation: none; opacity: 1; }
+}
+
+/* ── String wand minigame ───────────────────────────────────────────────── */
+
+.wand-game {
+  position:        absolute;
+  inset:           0;
+  z-index:         3;
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  gap:             var(--space-3);
+  padding:         max(var(--space-3), env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px))
+                   var(--space-4)
+                   max(var(--space-6), env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  background:      var(--room-bg);
+  overflow-y:      auto;
+  animation:       pet-drop var(--duration-base) var(--ease-out);
+}
+.wand-game__top {
+  display:               grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items:           center;
+  width:                 min(100%, 380px);
+  min-height:            44px;
+}
+.wand-game__round { justify-self: start; font: 700 12px ui-monospace, 'Courier New', monospace; color: var(--room-grey); }
+.wand-game__title { font: 700 16px ui-monospace, 'Courier New', monospace; color: var(--room-gold); }
+.wand-game__close {
+  justify-self: end;
+  width: 44px; height: 44px;
+  border-radius: var(--radius-md);
+  font-size: 28px; line-height: 1;
+  color: var(--room-silver);
+}
+
+.wand-game__stage {
+  position:     relative;
+  width:        min(100%, 360px);
+  touch-action: none;                  /* dragging must not scroll the page */
+  user-select:  none;
+  cursor:       crosshair;
+}
+.wand-game__stage[hidden] { display: none; }
+.wand-game__board-wrap {
+  position:      relative;
+  aspect-ratio:  1;
+  border:        2px dashed var(--room-line);
+  border-radius: var(--radius-md);
+  background:    #1B0D2B;
+}
+.wand-game__board { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.wand-game__guide {
+  fill: none;
+  stroke: var(--room-silver);
+  stroke-width: 3px;
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.85;
+}
+.wand-game__trail {
+  fill: none;
+  stroke: var(--room-gold);
+  stroke-width: 5px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.9;
+}
+.wand-game__string {
+  stroke: var(--room-silver);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.7;
+}
+.wand-game__start { fill: var(--room-gold-l); animation: wand-pulse 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.wand-game[data-tracing] .wand-game__start { animation: none; opacity: 0.4; }
+@keyframes wand-pulse { 50% { transform: scale(1.6); opacity: 0.5; } }
+
+.wand-game__lure {
+  position:       absolute;
+  transform:      translate(-50%, -30%);
+  pointer-events: none;
+  line-height:    0;
+}
+.wand-game__lure svg, .wand-game__floor svg { display: block; image-rendering: pixelated; max-width: none; }
+
+.wand-game__floor {
+  position:      relative;
+  height:        56px;
+  border-bottom: 2px solid var(--room-line);
+}
+.wand-game__floor .wand-game__cat {
+  position:   absolute;
+  width:      max-content;
+  left:       50%;
+  bottom:     0;
+  transform:  translateX(-50%);
+  transition: left 0.45s var(--ease-out);
+  pointer-events: none;
+}
+
+.wand-game__msg   { min-height: 1.5em; color: var(--room-silver); font-weight: 600; }
+.wand-game__stars { display: flex; gap: var(--space-4); font: 700 16px ui-monospace, 'Courier New', monospace; color: var(--room-grey); }
+.wand-game__tally[data-done="true"] { color: var(--room-gold); }
+
+.wand-game__finish { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); margin-top: 18vh; }
+.wand-game__finish[hidden] { display: none; }
+.wand-game__big { font: 700 28px ui-monospace, 'Courier New', monospace; color: var(--room-gold); }
+.wand-game__sub { color: var(--room-silver); }
+.wand-game__done {
+  min-width:     140px;
+  padding:       var(--space-3) var(--space-5);
+  border:        2px solid var(--room-gold);
+  border-radius: var(--radius-md);
+  background:    #1B0D2B;
+  color:         var(--room-gold-l);
+  font:          700 14px ui-monospace, 'Courier New', monospace;
+}
+
+html.reduce-motion .wand-game, html.reduce-motion .wand-game__start { animation: none; }
+html.reduce-motion .wand-game__floor .wand-game__cat { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .wand-game, .wand-game__start { animation: none; }
+  .wand-game__floor .wand-game__cat { transition: none; }
+}

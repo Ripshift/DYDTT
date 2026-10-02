@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "333297368391",
+    "project_id": "dydtt-c3633",
+    "storage_bucket": "dydtt-c3633.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:333297368391:android:7ae02d5d5ee588230d2062",
+        "android_client_info": {
+          "package_name": "com.dydtt.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "333297368391-hvvuktm30mlnnjkuimci6g2ckipla1hs.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0DNDOOk3v5kOhbR6qp4rxSE09fZujTAs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "333297368391-hvvuktm30mlnnjkuimci6g2ckipla1hs.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

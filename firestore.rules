@@ -7,6 +7,7 @@ rules_version = '2';
 //   users/{uid}/tasks/{taskId}      one doc per task; deletes are tombstones (deleted: true)
 //   users/{uid}/series/{seriesId}   repeating-task rules; copies live in tasks with seriesId
 //   users/{uid}/devices/{deviceId}  web-push subscriptions (task 14b)
+//   users/{uid}/pet/state           the cat game (one doc: the whole cat), shared by your devices
 //
 // Friends & Family
 //   profiles/{uid}                  { name, photo, code } — any signed-in user can read one by id
@@ -143,6 +144,29 @@ service cloud.firestore {
         && optional(d, 'updatedAt', d.get('updatedAt', 0) is number);
     }
 
+    function validPet() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['v', 'found', 'hunger', 'fun', 'love', 'poops', 'mice', 'coins', 'treats',
+                               'toys', 'poopClock', 'starveClock', 'lastTick', 'updatedAt', 'awarded', 'syncedAt'])
+        && d.keys().hasAll(['found', 'hunger', 'fun', 'love', 'coins', 'treats', 'lastTick', 'updatedAt', 'syncedAt'])
+        && d.syncedAt == request.time
+        && d.found is bool
+        && d.hunger is number && d.hunger >= 0 && d.hunger <= 100
+        && d.fun is number    && d.fun >= 0    && d.fun <= 100
+        && d.love is number   && d.love >= 0   && d.love <= 100
+        && d.coins is int     && d.coins >= 0  && d.coins <= 9999
+        && d.treats is int    && d.treats >= 0 && d.treats <= 99
+        && d.lastTick is number && d.updatedAt is number
+        && optional(d, 'v',           d.get('v', 0) is int)
+        && optional(d, 'poops',       d.get('poops', 0) is int && d.get('poops', 0) >= 0 && d.get('poops', 0) <= 3)
+        && optional(d, 'mice',        d.get('mice', 0) is int && d.get('mice', 0) >= 0 && d.get('mice', 0) <= 3)
+        && optional(d, 'poopClock',   d.get('poopClock', 0) is number)
+        && optional(d, 'starveClock', d.get('starveClock', 0) is number)
+        && optional(d, 'toys',        d.get('toys', {}) is map && d.get('toys', {}).size() <= 5
+                                      && d.get('toys', {}).keys().hasOnly(['mouse', 'ball', 'feather', 'spring', 'wand']))
+        && optional(d, 'awarded',     d.get('awarded', []) is list && d.get('awarded', []).size() <= 500);
+    }
+
     function validLevel(level) {
       return level in ['friend', 'family'];
     }
@@ -186,6 +210,12 @@ service cloud.firestore {
         allow delete: if isOwner(uid);
         allow create: if (isOwner(uid) && validTask(taskId)) || familyCreate(uid, taskId);
         allow update: if (isOwner(uid) && validTask(taskId)) || familyTick(uid);
+      }
+
+      // The cat game — only you, from any of your devices
+      match /pet/{petId} {
+        allow read, delete:   if isOwner(uid);
+        allow create, update: if isOwner(uid) && petId == 'state' && validPet();
       }
 
       match /series/{seriesId} {

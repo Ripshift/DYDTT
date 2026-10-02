@@ -16,7 +16,9 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  signInWithCredential,
 } from 'firebase/auth';
+import { isNative } from '../platform.js';
 
 import { auth }  from '../firebase.js';
 import { store } from '../store.js';
@@ -72,6 +74,7 @@ function friendlyError(code) {
  * @returns {{ user: object|null, error: string|null }}
  */
 export async function signInWithGoogle() {
+  if (isNative()) return signInWithGoogleNative();
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return { user: serialiseUser(result.user), error: null };
@@ -83,6 +86,27 @@ export async function signInWithGoogle() {
     }
     console.error('[Auth] Google sign-in failed:', err.code, err.message);
     return { user: null, error: friendlyError(err.code) };
+  }
+}
+
+/**
+ * Android app: Google blocks its sign-in page inside app web views, so use the
+ * native Google account picker, then hand its ID token to the Firebase JS SDK.
+ */
+async function signInWithGoogleNative() {
+  try {
+    const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+    const res = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+    const idToken = res?.credential?.idToken;
+    if (!idToken) return { user: null, error: 'Google sign-in didn\'t return an account. Please try again.' };
+    const result = await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
+    return { user: serialiseUser(result.user), error: null };
+  } catch (err) {
+    const msg = String(err?.message ?? '');
+    if (/cancel/i.test(msg)) return { user: null, error: 'Sign-in was cancelled.' };
+    console.error('[Auth] Native Google sign-in failed:', err?.code, msg);
+    if (err?.code?.startsWith?.('auth/')) return { user: null, error: friendlyError(err.code) };
+    return { user: null, error: `Google sign-in failed: ${msg || 'unknown error'}` };
   }
 }
 
@@ -149,6 +173,11 @@ export async function resetPassword(email) {
 
 export async function signOutUser() {
   await signOut(auth);
+  if (isNative()) {
+    // Also forget the Google account on the device, so the picker shows next time
+    const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+    await FirebaseAuthentication.signOut().catch(() => {});
+  }
 }
 
 // ── Auth state listener ───────────────────────────────────────────────────

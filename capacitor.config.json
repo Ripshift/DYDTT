@@ -1,0 +1,26 @@
+{
+  "appId": "com.dydtt.app",
+  "appName": "DYDTT",
+  "webDir": "dist",
+  "backgroundColor": "#141414",
+  "android": {
+    "backgroundColor": "#141414"
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": [
+        "google.com"
+      ]
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_dydtt",
+      "iconColor": "#C9A84C"
+    },
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DARK",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 /**
  * DYDTT Phase 1 — Modal Component
- * Tabs: Edit · Settings · Account.
+ * Tabs: Edit · Display · Account.
  * Account shows sign-in when signed out, the profile + sign-out when signed in
  * (and will host Friends & Family later).
  */
@@ -13,11 +13,12 @@ import { signInWithGoogle, signInWithEmail,
 import EditPanel                                       from './EditPanel.js';
 import { signOutAndClear }                              from '../sync/index.js';
 import AccountPanel                                     from './AccountPanel.js';
+import { isNative }                                     from '../platform.js';
 import { setSignupName }                                from '../social/social.js';
 import { requestPermission, getPermissionState }         from '../push/client.js';
 
 const TABS = ['edit', 'settings', 'auth'];
-const TAB_LABELS = { edit: 'Edit', settings: 'Settings', auth: 'Account' };
+const TAB_LABELS = { edit: 'Edit', settings: 'Display', auth: 'Account' };
 
 const VIEWS = [
   { key: 'day',     label: '1 Day',   desc: 'Single day, swipe to navigate' },
@@ -191,9 +192,13 @@ export default class Modal {
     p.querySelector('#setting-pushEnabled').setAttribute('aria-describedby', 'reminder-hint');
     p.appendChild(hint);
     const setReminderHint = (perm) => {
-      hint.textContent = perm === 'denied'
-        ? 'Notifications are blocked for DYDTT. Allow them in your browser\'s site settings, then turn this on again.'
-        : 'Reminders always pop up inside DYDTT while it\'s open. Turn this on to also get system notifications.';
+      hint.textContent = isNative()
+        ? (perm === 'denied'
+            ? 'Notifications are blocked for DYDTT. Allow them in Android Settings → Apps → DYDTT → Notifications.'
+            : 'Reminders arrive as phone notifications, even when DYDTT is closed.')
+        : (perm === 'denied'
+            ? 'Notifications are blocked for DYDTT. Allow them in your browser\'s site settings, then turn this on again.'
+            : 'Reminders always pop up inside DYDTT while it\'s open. Turn this on to also get system notifications.');
       hint.classList.toggle('settings-hint--warn', perm === 'denied');
     };
     setReminderHint(getPermissionState() === 'denied' ? 'denied' : 'default');

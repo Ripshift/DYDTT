@@ -27,7 +27,7 @@ DYDTT is a square-first, ultrahigh-end daily task manager PWA. The visual langua
 grey + gold + purple — muted luxury, not garish colour. The UX surface is deliberately
 minimal: one burger menu, no other chrome buttons visible, and all navigation is gestural
 (swipe left/right for days, scroll for tasks). The weekly overview is the "9 Day" view: a 3x3
-grid of the surrounding days above the selected day's tasks, chosen in Settings.
+grid of the surrounding days above the selected day's tasks, chosen in the Display tab.
 
 ### Core Phase 1 Features
 

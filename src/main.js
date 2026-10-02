@@ -20,6 +20,12 @@ import { initReminders }       from './push/reminders.js';
 import { initSync }            from './sync/index.js';
 import { initSocial }          from './social/social.js';
 import SharedBar               from './components/SharedBar.js';
+import { createMascot }        from './components/Mascot.js';
+import { openSecretPage }      from './components/SecretPage.js';
+import { createPetBowl }       from './components/PetBowl.js';
+import { initPet }             from './pet/petStore.js';
+import { isNative }            from './platform.js';
+import { initNative }          from './native/index.js';
 import BurgerMenu              from './components/BurgerMenu.js';
 import DayView                 from './components/DayView.js';
 import FortyEightHourView      from './components/FortyEightHourView.js';
@@ -73,6 +79,16 @@ async function boot() {
   topBar.className = 'top-bar';
   topBar.setAttribute('role', 'banner');
   app.appendChild(topBar);
+  // The cat lying on the top bar's line, watching over the calendar
+  // Tap him 14 times: in the Android app he opens his eyes and shows his secret page;
+  // on the website he keeps them shut and just purrs.
+  topBar.appendChild(createMascot({
+    scale:       2,
+    canOpenEyes: isNative(),
+    onSecret:    openSecretPage,
+  }));
+  // Once his secret page has been found, a little food bowl next to him opens the cat game
+  if (isNative()) topBar.appendChild(createPetBowl({ scale: 2, onOpen: openSecretPage }));
 
   const burger = new BurgerMenu({ container: topBar });
   const modal  = new Modal({ container: app });
@@ -96,7 +112,15 @@ async function boot() {
   store.subscribe('settings', (s) => viewManager.mount(s.activeView ?? 'day'));
 
   router.init();
-  if (!import.meta.env.DEV) registerSW();
+  // Android app: files are already on the phone — no service worker; OS reminders instead
+  // The cat game's state (the Android app loads it in initNative, before its daily hello).
+  // The website never shows the game, but once he's been found it still earns coins for ticked tasks.
+  if (!isNative()) initPet().catch(err => console.error('[Pet] init failed', err));
+  if (isNative()) {
+    initNative().catch(err => console.error('[Native] init failed', err));
+  } else if (!import.meta.env.DEV) {
+    registerSW();
+  }
   initReminders();
   // Cloud sync (Firestore is loaded only once someone signs in)
   initSync().catch(err => console.error('[Sync] init failed', err));

@@ -296,3 +296,38 @@ describe('viewing shared tasks', () => {
     await assertFails(getDoc(doc(bob(), 'users/alice/tasks/near')));
   });
 });
+
+describe('cat game (pet/state)', () => {
+  const P = (over = {}) => ({
+    v: 2, found: true, hunger: 80, fun: 70, love: 60, poops: 1, mice: 0, coins: 12, treats: 3,
+    toys: { ball: { until: 1800000000000 } }, poopClock: 1.5, starveClock: 0,
+    lastTick: 1790000000000, updatedAt: 1790000000000, awarded: ['t1', 't2'],
+    syncedAt: serverTimestamp(), ...over,
+  });
+
+  it('owner can save and read their cat', async () => {
+    const ref = doc(alice(), 'users/alice/pet/state');
+    await assertSucceeds(setDoc(ref, P()));
+    await assertSucceeds(getDoc(ref));
+    await assertSucceeds(setDoc(ref, P({ coins: 13, awarded: ['t1', 't2', 't3'] })));
+  });
+
+  it('rejects bad shapes and values', async () => {
+    const ref = doc(alice(), 'users/alice/pet/state');
+    await assertFails(setDoc(ref, P({ coins: -1 })));
+    await assertFails(setDoc(ref, P({ coins: 1.5 })));
+    await assertFails(setDoc(ref, P({ hunger: 101 })));
+    await assertFails(setDoc(ref, P({ toys: { rocket: { until: 1 } } })));
+    await assertFails(setDoc(ref, P({ extra: true })));
+    await assertFails(setDoc(ref, P({ syncedAt: 5 })));
+    await assertFails(setDoc(ref, omit(P(), 'coins')));
+    await assertFails(setDoc(doc(alice(), 'users/alice/pet/other'), P()));   // only one cat
+  });
+
+  it('nobody else can see or change it', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'users/alice/pet/state'), P()));
+    await assertFails(getDoc(doc(bob(), 'users/alice/pet/state')));
+    await assertFails(setDoc(doc(bob(), 'users/alice/pet/state'), P({ coins: 9999 })));
+    await assertFails(getDoc(doc(anon(), 'users/alice/pet/state')));
+  });
+});

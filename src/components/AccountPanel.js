@@ -195,7 +195,7 @@ export default class AccountPanel {
       store.dispatch('MODAL_CLOSE');
       await social.openShared(c);
     });
-    const level = menuItem(`They see: ${c.myLevel === 'family' ? 'Family' : 'Friend'} — change`, async () => {
+    const level = menuItem('Change Their F&F Level', async () => {
       this.#closePopover();
       const lvl = await askLevel(c.name, c.myLevel);
       if (lvl && lvl !== c.myLevel) await run(() => social.setContactLevel(c.uid, lvl), `${c.name} now sees: ${LEVEL_TEXT[lvl].label}`);

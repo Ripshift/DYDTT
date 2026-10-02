@@ -118,6 +118,7 @@ function createStore(initial) {
       // ── Tasks ────────────────────────────────────────────────────────────
       case 'TASK_UPSERT': {
         await upsertTask(payload);
+        if (payload.done === true) taskDoneListeners.forEach(fn => fn(payload.id));
         await dispatch('REFRESH');
         break;
       }
@@ -238,6 +239,13 @@ function createStore(initial) {
   }
 
   return { get state() { return state; }, subscribe, dispatch, init };
+}
+
+/** Called with the task id whenever one of my tasks is ticked off. */
+const taskDoneListeners = new Set();
+export function onTaskDone(fn) {
+  taskDoneListeners.add(fn);
+  return () => taskDoneListeners.delete(fn);
 }
 
 export const store = createStore(initialState);

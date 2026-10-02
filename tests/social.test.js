@@ -204,7 +204,7 @@ describe('connecting', () => {
     $('.ff-circle').click();
     expect(document.querySelector('.ff-popover').textContent).toContain('View Bob\'s Tasks');
     expect(document.querySelector('.ff-popover').textContent).toContain('Remove Bob From List');
-    await pick('They see');
+    await pick('Change Their F&F Level');
     await pick('Family');
     expect(backend.viewers.get('alice/bob').level).toBe('family');
 

@@ -6,6 +6,7 @@
 
 import { urlBase64ToUint8Array } from './vapid.js';
 import { logPushSent }           from '../db/schema.js';
+import { isNative }              from '../platform.js';
 
 /** The active SW registration, or null (e.g. in `pnpm dev`, where no SW is registered). */
 async function getRegistration() {
@@ -21,12 +22,23 @@ const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY ?? '';
  * Request notification permission.
  * Returns 'granted' | 'denied' | 'default'.
  */
+// In the Android app, permission comes from the OS (see src/native/), cached here
+let nativePermission = null;
+export function setNativePermission(p) { nativePermission = p; }
+export function nativePermissionKnown() { return nativePermission !== null; }
+
 export async function requestPermission() {
+  if (isNative()) {
+    const { notificationPermission } = await import('../native/notifications.js');
+    nativePermission = await notificationPermission(true);
+    return nativePermission;
+  }
   if (!('Notification' in window)) return 'denied';
   return Notification.requestPermission();
 }
 
 export function getPermissionState() {
+  if (isNative()) return nativePermission ?? 'default';
   if (!('Notification' in window)) return 'denied';
   return Notification.permission;
 }

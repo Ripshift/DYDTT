@@ -7,6 +7,7 @@
 
 import { createFocusTrap, announce }                    from '../utils/a11y.js';
 import { store }                                         from '../store.js';
+import { isDesktopMode } from '../utils/desktopMode.js';
 import { signInWithGoogle, signInWithEmail,
          signUpWithEmail, resetPassword,
          signOutUser }                                   from '../auth/authManager.js';
@@ -148,6 +149,30 @@ export default class Modal {
     viewSection.appendChild(viewPicker);
     p.appendChild(viewSection);
     this.#unsubs.push(store.subscribe('settings', (s) => syncPicker(s.activeView ?? 'day')));
+
+    // Desktop Mode: wide layouts, ‹ › arrows, no swiping between days
+    {
+      const row = document.createElement('div');
+      row.className = 'toggle-row';
+      const lbl = document.createElement('label');
+      lbl.className = 'toggle-label'; lbl.htmlFor = 'setting-desktopMode'; lbl.textContent = 'Desktop Mode';
+      const sw  = document.createElement('label'); sw.className = 'toggle-switch';
+      const inp = document.createElement('input');
+      inp.type = 'checkbox'; inp.id = 'setting-desktopMode';
+      const track = document.createElement('span'); track.className = 'toggle-track';
+      sw.append(inp, track); row.append(lbl, sw);
+      const hint = document.createElement('p');
+      hint.className = 'settings-hint';
+      const sync = (st) => {
+        inp.checked = isDesktopMode(st);
+        hint.textContent = 'Wide layout for a computer screen. Use the ‹ › arrows to change day — swiping won\'t.'
+          + (st.desktopMode == null ? ' (Automatic for this screen.)' : '');
+      };
+      inp.addEventListener('change', () => store.dispatch('SETTING_SET', { key: 'desktopMode', value: inp.checked }));
+      sync(store.state.settings);
+      this.#unsubs.push(store.subscribe('settings', sync));
+      p.append(row, hint);
+    }
 
     const divider = document.createElement('hr');
     divider.className = 'settings-divider';

@@ -14,6 +14,7 @@ export default class DayView {
   #panels    = [];
   #swiper    = null;
   #itemMap   = new Map();   // taskId -> TaskItem instance
+  #lastTasks = [];
   #unsubs    = [];
 
   constructor({ container }) {
@@ -84,13 +85,26 @@ export default class DayView {
       <h1 class="day-header__date">
         ${parsed.day}
         <span class="day-header__month">${parsed.monthAbbr} ${parsed.year}</span>
-      </h1>`;
+      </h1>
+      <p class="day-header__progress"></p>`;
+    this.#renderProgress();
 
     document.title = `${label} — DYDTT`;
     announce(`${label}, ${parsed.weekday} ${parsed.day} ${parsed.month}`);
   }
 
+  /** "3 of 7 done" — shown in the Desktop Mode sidebar. */
+  #renderProgress(tasks = this.#lastTasks) {
+    const el = this.#panels[1].querySelector('.day-header__progress');
+    if (!el) return;
+    const total = tasks.length;
+    const done = tasks.filter(t => t.done).length;
+    el.textContent = total === 0 ? 'Nothing planned' : done === total ? `All ${total} done` : `${done} of ${total} done`;
+  }
+
   #renderTasks(tasks) {
+    this.#lastTasks = tasks;
+    this.#renderProgress(tasks);
     const panel = this.#panels[1];
     const selectedId = store.state.ui.selectedTaskId;
 

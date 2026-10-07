@@ -23,6 +23,8 @@ import SharedBar               from './components/SharedBar.js';
 import { createMascot }        from './components/Mascot.js';
 import { openSecretPage }      from './components/SecretPage.js';
 import { createPetBowl }       from './components/PetBowl.js';
+import { createDayArrows }     from './components/DayArrows.js';
+import { initDesktopMode, setViewAttr } from './utils/desktopMode.js';
 import { initPet }             from './pet/petStore.js';
 import { isNative }            from './platform.js';
 import { initNative }          from './native/index.js';
@@ -48,6 +50,7 @@ class ViewManager {
       default:         this.#currentView = new DayView({ container });            break;
     }
     this.#currentKey = viewKey;
+    setViewAttr(viewKey === '48h' || viewKey === 'week3x3' ? viewKey : 'day');
   }
 }
 
@@ -56,6 +59,7 @@ async function boot() {
   if (import.meta.env.DEV) await seed();
   await store.init();
   applyMotionPref(store.state.settings.reducedMotion);
+  initDesktopMode();
 
   // Initialise Firebase auth listener — fires before first render
   initAuth();
@@ -110,6 +114,9 @@ async function boot() {
   const viewManager = new ViewManager(main);
   viewManager.mount(store.state.settings.activeView ?? 'day');
   store.subscribe('settings', (s) => viewManager.mount(s.activeView ?? 'day'));
+
+  // Desktop Mode: ‹ › arrows at the screen edges change the day
+  app.appendChild(createDayArrows());
 
   router.init();
   // Android app: files are already on the phone — no service worker; OS reminders instead

@@ -10,7 +10,7 @@ describe('dateHelpers (display)', () => {
     expect(D.relativeLabel(t)).toBe('Today');
     expect(D.relativeLabel(D.addDays(t, 1))).toBe('Tomorrow');
     expect(D.relativeLabel(D.addDays(t, -1))).toBe('Yesterday');
-    expect(D.relativeLabel('2026-10-05')).toMatch(/^\w+, Oct 5$/);
+    expect(D.relativeLabel('2020-03-05')).toMatch(/^\w+, Mar 5$/);   // a date that's never today ± 1
   });
   it('parseDisplayDate', () => {
     expect(D.parseDisplayDate('2026-10-01')).toMatchObject({ day: 1, weekday: 'Thursday', month: 'October', monthAbbr: 'Oct', year: 2026 });

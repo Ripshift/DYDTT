@@ -40,6 +40,8 @@ export default class SwipeController {
   #onUp = (e) => {
     if (!this.#active) return;
     this.#active = false;
+    // Desktop Mode: mouse drags don't change the day (the ‹ › arrows do)
+    if (document.documentElement.classList.contains('desktop-mode')) return;
     const dx = e.clientX - this.#startX;
     const dy = e.clientY - this.#startY;
     if (Math.abs(dx) < this.#threshold) return;

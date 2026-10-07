@@ -23,6 +23,7 @@ const initialState = {
     userName:           '',
     theme:              'dark',
     activeView:         'day',
+    desktopMode:        null,        // null = automatic (see utils/desktopMode.js)
   },
   ui: {
     modalOpen:      false,

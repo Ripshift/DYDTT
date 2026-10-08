@@ -7,7 +7,7 @@ import {
 } from '../src/pet/pet.js';
 import {
   initPet, getPet, isFound, markFound, refreshPet, doAction, buyItem, earnCoin, subscribePet,
-  onRemote, uploadNow, UPLOAD_DELAY_MS, _resetPet,
+  onRemote, uploadNow, UPLOAD_DELAY_MS, _resetPet, resumePetSync,
 } from '../src/pet/petStore.js';
 import { toCloud, PET_FIELDS } from '../src/pet/petCloud.js';
 import { openSecretPage, closeSecretPage, isSecretOpen, secretBack, litterGrid, isStinky, isDaytime, WINDOW_CHECK_MS, PURR_EVERY_MS } from '../src/components/SecretPage.js';
@@ -220,7 +220,8 @@ const fakeCloud = () => {
   const c = {
     docs: {}, cb: null,
     put: vi.fn(async (uid, pet) => { c.docs[uid] = JSON.parse(JSON.stringify(pet)); }),
-    listen: vi.fn((uid, cb) => { c.cb = cb; return () => { c.cb = null; }; }),
+    listen: vi.fn((uid, cb, onErr) => { c.cb = cb; c.onErr = onErr; return () => { c.cb = null; }; }),
+    get: vi.fn(async (uid) => c.docs[uid] ?? null),
   };
   return c;
 };
@@ -345,6 +346,78 @@ describe('pet store', () => {
     await expect(uploadNow()).resolves.toBeUndefined();
     expect(err).toHaveBeenCalled();
     err.mockRestore();
+  });
+});
+
+describe('cat sync safety', () => {
+  it('"no cat" from the phone\'s own memory is ignored; nothing uploads until the account has been heard', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const cloud = fakeCloud();
+    await initPet({ cloud });
+    await markFound();                                              // found while signed out
+    await store.dispatch('AUTH_SET', { user: { uid: 'u3' } });
+    await onRemote(null, { fromCache: true });                      // offline / not loaded yet
+    await doAction('pet');
+    await vi.advanceTimersByTimeAsync(UPLOAD_DELAY_MS * 2);
+    expect(cloud.put).not.toHaveBeenCalled();                       // might have overwritten the account's cat
+    await onRemote(null);                                           // the server: really no cat yet
+    expect(cloud.put).toHaveBeenCalledTimes(1);
+    expect(cloud.docs.u3.found).toBe(true);
+    expect(cloud.docs.u3.newHere).toBeUndefined();
+  });
+
+  it('a cat found on a new phone (or after reinstalling) never replaces the one in your account', async () => {
+    const cloud = fakeCloud();
+    const mine = { ...newPet(Date.now() - D), coins: 57, treats: 4, toys: { wand: { until: Date.now() + 9 * D } }, awarded: ['a', 'b'], updatedAt: Date.now() - H };
+    cloud.docs.u4 = mine;
+    await initPet({ cloud });
+    await store.dispatch('AUTH_SET', { user: { uid: 'u4' } });
+    const p = await markFound();                                    // 14 taps on the new phone
+    expect(cloud.get).toHaveBeenCalledWith('u4');
+    expect(p.coins).toBe(57);                                       // he's back, coins, toys and all
+    expect(p.toys.wand).toBeTruthy();
+    expect(p.newHere).toBeUndefined();
+  });
+
+  it('if the account could not be checked, the new cat still loses to the account one when it arrives', async () => {
+    const cloud = fakeCloud();
+    cloud.get.mockRejectedValueOnce(new Error('offline'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await initPet({ cloud });
+    await store.dispatch('AUTH_SET', { user: { uid: 'u5' } });
+    await markFound();
+    expect(getPet().newHere).toBe(true);
+    await doAction('feed');                                         // newer care, but still a stranger
+    await earnCoin('here');
+    await onRemote({ ...newPet(Date.now() - D), coins: 40, awarded: ['old'], updatedAt: Date.now() - D });
+    expect(getPet().coins).toBe(41);                                // account's cat + the coin earned here
+    expect(getPet().newHere).toBeUndefined();
+    warn.mockRestore();
+  });
+
+  it('if syncing failed (e.g. no permission), it tries again when the app comes back', async () => {
+    const cloud = fakeCloud();
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await initPet({ cloud });
+    await store.dispatch('AUTH_SET', { user: { uid: 'u6' } });
+    expect(cloud.listen).toHaveBeenCalledTimes(1);
+    resumePetSync();
+    expect(cloud.listen).toHaveBeenCalledTimes(1);                  // fine: nothing to do
+    cloud.onErr(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    expect(document.querySelector('.toast')?.textContent).toMatch(/couldn't sync/);
+    resumePetSync();
+    expect(cloud.listen).toHaveBeenCalledTimes(2);
+    err.mockRestore();
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+  });
+
+  it('merge: newHere side loses whichever is newer', () => {
+    const acct = { ...newPet(T0), coins: 50, awarded: ['a'], updatedAt: T0 };
+    const fresh = { ...newPet(T0 + D), newHere: true, awarded: ['b'] };
+    for (const m of [mergePets(fresh, acct), mergePets(acct, fresh)]) {
+      expect(m.coins).toBe(51);
+      expect(m.newHere).toBeUndefined();
+    }
   });
 });
 

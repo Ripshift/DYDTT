@@ -1733,8 +1733,10 @@ html.reduce-motion .wand-game__floor .wand-game__cat { transition: none; }
   .wand-game__floor .wand-game__cat { transition: none; }
 }
 
-/* ══ Desktop Mode (Display ▸ Desktop Mode) ═══════════════════════════════ */
-/* <html class="desktop-mode" data-view="day | 48h | week3x3">              */
+/* ══ Desktop Mode (website) / Landscape Mode (app) ═══════════════════════ */
+/* <html class="wide-layout [desktop-mode | landscape-mode]"                */
+/*       data-view="day | 48h | week3x3">                                   */
+/* wide-layout = the layouts; desktop-mode = ‹ › arrows + no swiping        */
 
 .day-arrows,
 .day-header__progress { display: none; }
@@ -1765,16 +1767,21 @@ html.desktop-mode .swipe-hint { display: none; }
 html.shared-mode .day-arrow { z-index: var(--z-topbar); }
 
 /* ── Wide screens ─────────────────────────────────────────────────────── */
-@media (min-width: 900px) {
-  html.desktop-mode {
+/* A computer / tablet, or any phone turned sideways (≥480px wide) */
+@media (min-width: 900px), (orientation: landscape) and (min-width: 480px) {
+  html.wide-layout {
     --app-max: 1440px;
-    --side:    clamp(240px, 32vw, 460px);    /* sidebar / grid column: about a third */
+    --side:    clamp(200px, 32vw, 460px);    /* sidebar / grid column: about a third */
+    --inset-l: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+    --inset-r: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
   }
-  html.desktop-mode #app { max-width: var(--app-max); }
+  /* Phone sideways: keep clear of the camera notch / navigation bar */
+  html.landscape-mode #app { padding-left: var(--inset-l); padding-right: var(--inset-r); }
+  html.wide-layout #app { max-width: var(--app-max); }
 
   /* The menu opens as a centred panel instead of a bottom sheet */
-  html.desktop-mode .modal-overlay { align-items: center; justify-content: center; }
-  html.desktop-mode .modal-panel {
+  html.wide-layout .modal-overlay { align-items: center; justify-content: center; }
+  html.wide-layout .modal-panel {
     width:         min(560px, calc(100vw - 48px));
     max-height:    86dvh;
     border:        1px solid var(--color-border-subtle);
@@ -1782,22 +1789,22 @@ html.shared-mode .day-arrow { z-index: var(--z-topbar); }
   }
 
   /* ── 1 day: date sidebar (cat in its top-left), tasks on the right ── */
-  html.desktop-mode[data-view="day"] #app::before {
+  html.wide-layout[data-view="day"] #app::before {
     content:        '';
     position:       absolute;
     top: 0; bottom: 0; left: 0;
-    width:          var(--side);
+    width:          calc(var(--side) + var(--inset-l, 0px));
     background:     var(--color-bg-surface);
     border-right:   1px solid var(--color-border-subtle);
     pointer-events: none;
     z-index:        0;
   }
-  html.desktop-mode[data-view="day"] main { position: relative; z-index: 1; }
-  html.desktop-mode[data-view="day"] .top-bar {
+  html.wide-layout[data-view="day"] main { position: relative; z-index: 1; }
+  html.wide-layout[data-view="day"] .top-bar {
     background:          transparent;
     border-bottom-color: transparent;
   }
-  html.desktop-mode[data-view="day"] .top-bar::after {   /* the cat's line, only under the sidebar */
+  html.wide-layout[data-view="day"] .top-bar::after {   /* the cat's line, only under the sidebar */
     content:    '';
     position:   absolute;
     left: 0; bottom: -1px;
@@ -1805,9 +1812,9 @@ html.shared-mode .day-arrow { z-index: var(--z-topbar); }
     height:     1px;
     background: var(--color-border-subtle);
   }
-  html.desktop-mode[data-view="day"] .swipe-track { width: 100%; transform: none; }
-  html.desktop-mode[data-view="day"] .swipe-panel { display: none; }
-  html.desktop-mode[data-view="day"] .swipe-panel:nth-child(2) {
+  html.wide-layout[data-view="day"] .swipe-track { width: 100%; transform: none; min-height: 0; }
+  html.wide-layout[data-view="day"] .swipe-panel { display: none; }
+  html.wide-layout[data-view="day"] .swipe-panel:nth-child(2) {
     display:               grid;
     flex:                  0 0 100%;
     grid-template-columns: var(--side) 1fr;
@@ -1817,12 +1824,12 @@ html.shared-mode .day-arrow { z-index: var(--z-topbar); }
     overflow:              hidden;
   }
   /* 1 day: the ‹ arrow sits on the sidebar's inner edge, clear of the big date */
-  html.desktop-mode[data-view="day"] .day-arrow--prev {
+  html.wide-layout[data-view="day"] .day-arrow--prev {
     left: calc(max(0px, (100vw - var(--app-max)) / 2) + var(--side) + 4px);
   }
 
   /* Date info scales with the sidebar: each line spans about 60% of its width */
-  html.desktop-mode[data-view="day"] .swipe-panel .day-header {
+  html.wide-layout[data-view="day"] .swipe-panel .day-header {
     grid-column:   1;
     grid-row:      1;
     align-self:    start;
@@ -1830,31 +1837,31 @@ html.shared-mode .day-arrow { z-index: var(--z-topbar); }
     margin:        0;
     border-bottom: none;
   }
-  html.desktop-mode[data-view="day"] .swipe-panel .day-header__weekday {
+  html.wide-layout[data-view="day"] .swipe-panel .day-header__weekday {
     font-size:      calc(var(--side) * var(--k-weekday, 0.05));
     margin-bottom:  calc(var(--side) * 0.02);
   }
-  html.desktop-mode[data-view="day"] .swipe-panel .day-header__date {
+  html.wide-layout[data-view="day"] .swipe-panel .day-header__date {
     font-size:      calc(var(--side) * var(--k-date, 0.5));
     flex-direction: column;
     align-items:    flex-start;
     gap:            calc(var(--side) * 0.03);
   }
-  html.desktop-mode[data-view="day"] .swipe-panel .day-header__month {
+  html.wide-layout[data-view="day"] .swipe-panel .day-header__month {
     font-size:      calc(var(--side) * var(--k-month, 0.126));
     font-weight:    300;
     letter-spacing: normal;
     word-spacing:   0.15em;
     line-height:    1;
   }
-  html.desktop-mode[data-view="day"] .day-header__progress {
+  html.wide-layout[data-view="day"] .day-header__progress {
     display:    block;
     margin-top: calc(var(--side) * 0.06);
     font-size:  calc(var(--side) * var(--k-progress, 0.07));
     color:      var(--color-text-secondary);
   }
-  html.desktop-mode[data-view="day"] .swipe-panel .task-list,
-  html.desktop-mode[data-view="day"] .swipe-panel .task-list--empty {
+  html.wide-layout[data-view="day"] .swipe-panel .task-list,
+  html.wide-layout[data-view="day"] .swipe-panel .task-list--empty {
     grid-column:   2;
     grid-row:      1;
     min-height:    0;
@@ -1864,16 +1871,16 @@ html.shared-mode .day-arrow { z-index: var(--z-topbar); }
   }
 
   /* ── 48 hours: normal top bar, the two days side by side ── */
-  html.desktop-mode[data-view="48h"] .fhv { flex-direction: row; }
-  html.desktop-mode[data-view="48h"] .fhv__panel {
+  html.wide-layout[data-view="48h"] .fhv { flex-direction: row; }
+  html.wide-layout[data-view="48h"] .fhv__panel {
     padding:       var(--space-6) var(--space-10, 40px) 0;
     border-bottom: none;
     border-right:  1px solid var(--color-border-subtle);
   }
-  html.desktop-mode[data-view="48h"] .fhv__panel:last-child { border-right: none; }
+  html.wide-layout[data-view="48h"] .fhv__panel:last-child { border-right: none; }
 
   /* ── 3×3: the grid on the left third, the day's tasks on the right ── */
-  html.desktop-mode[data-view="week3x3"] .wgv {
+  html.wide-layout[data-view="week3x3"] .wgv {
     display:               grid;
     grid-template-columns: var(--side) 1fr;
     grid-template-rows:    auto minmax(0, 1fr);
@@ -1881,12 +1888,181 @@ html.shared-mode .day-arrow { z-index: var(--z-topbar); }
     row-gap:               var(--space-4);
     padding:               var(--space-6) var(--space-10, 40px) 0;
   }
-  html.desktop-mode[data-view="week3x3"] .wgv__header { grid-column: 1; grid-row: 1; }
-  html.desktop-mode[data-view="week3x3"] .wgv__grid   { grid-column: 1; grid-row: 2; align-self: start; }
-  html.desktop-mode[data-view="week3x3"] .wgv__tasks  {
+  html.wide-layout[data-view="week3x3"] .wgv__header { grid-column: 1; grid-row: 1; }
+  html.wide-layout[data-view="week3x3"] .wgv__grid   { grid-column: 1; grid-row: 2; align-self: start; }
+  html.wide-layout[data-view="week3x3"] .wgv__tasks  {
     grid-column:  2;
     grid-row:     1 / 3;
     padding-left: var(--space-8);
     border-left:  1px solid var(--color-border-subtle);
   }
+}
+
+/* ── Short screens: a phone turned sideways ───────────────────────────────── */
+/* Everything shrinks so the date, the 3×3 grid and the day columns fit the
+   height; task lists scroll inside their own zones. */
+@media (orientation: landscape) and (max-height: 540px) and (min-width: 480px) {
+  html.wide-layout .top-bar { padding-bottom: var(--space-2); }
+  html.wide-layout .swipe-hint { display: none; }          /* every pixel of height counts */
+  html.wide-layout .modal-panel { max-height: 94dvh; }
+
+  /* 1 day: smaller date so it fits the height; sidebar scrolls if it must */
+  html.wide-layout[data-view="day"] {
+    --k-weekday: 0.05; --k-date: 0.36; --k-month: 0.1; --k-progress: 0.06;
+  }
+  html.wide-layout[data-view="day"] .swipe-panel .day-header {
+    max-height: 100%;
+    overflow-y: auto;
+    padding:    var(--space-4) var(--space-4);
+  }
+  html.wide-layout[data-view="day"] .day-header__progress { margin-top: calc(var(--side) * 0.04); }
+  html.wide-layout[data-view="day"] .swipe-panel .task-list,
+  html.wide-layout[data-view="day"] .swipe-panel .task-list--empty {
+    padding: var(--space-4) var(--space-6) var(--space-6);
+  }
+
+  /* 48 hours: tighter columns, smaller day headings */
+  html.wide-layout[data-view="48h"] .fhv__panel {
+    padding: var(--space-2) var(--space-5, 20px) 0;
+    gap:     var(--space-2);
+  }
+  html.wide-layout[data-view="48h"] .fhv__panel .day-header { padding-bottom: 0; }
+  html.wide-layout[data-view="48h"] .day-header__date--sm { font-size: var(--text-xl); }
+
+  /* 3×3: a smaller grid that stretches to fill the height, never past it */
+  html.wide-layout[data-view="week3x3"] .wgv {
+    padding:    var(--space-2) var(--space-5, 20px) var(--space-3);
+    column-gap: var(--space-5, 20px);
+    row-gap:    var(--space-2);
+  }
+  html.wide-layout[data-view="week3x3"] .wgv__grid {
+    align-self:         stretch;
+    min-height:         0;
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    gap:                var(--space-1);
+  }
+  html.wide-layout[data-view="week3x3"] .week-cell {
+    min-height: 0;
+    padding:    2px;
+    gap:        1px;
+    overflow:   hidden;
+  }
+  html.wide-layout[data-view="week3x3"] .week-cell__num  { font-size: var(--text-lg); }
+  html.wide-layout[data-view="week3x3"] .week-cell__dots { margin-top: 1px; }
+  html.wide-layout[data-view="week3x3"] .wgv__tasks { padding-left: var(--space-5, 20px); }
+}
+
+/* ── Cat's room, sideways (Landscape Mode) ────────────────────────────────── */
+/* Room on the right at full height (the window's top third cropped off so it
+   fits); header across the left; the 4 bars stacked in one column with the
+   5 buttons stacked beside them. */
+@media (orientation: landscape) and (min-width: 480px) {
+  html.landscape-mode .secret-page {
+    display:               grid;
+    grid-template-columns: auto auto 380px;
+    grid-template-rows:    auto auto minmax(0, 1fr);
+    grid-template-areas:   "header  header  room"
+                           "meters  actions room"
+                           "status  actions room";
+    justify-content:       center;
+    align-items:           start;
+    column-gap:            var(--space-4);
+    row-gap:               var(--space-2);
+    overflow-x:            hidden;
+    padding:               max(var(--space-2), env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px))
+                           max(var(--space-3), env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px))
+                           max(var(--space-2), env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px))
+                           max(var(--space-3), env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+  }
+  html.landscape-mode .pet-header  { grid-area: header; width: 100%; }
+  html.landscape-mode .pet-header  { grid-template-columns: auto 1fr auto; column-gap: var(--space-2); }
+  html.landscape-mode .pet-coins svg { flex-shrink: 0; }
+  html.landscape-mode .secret-page__title { font-size: 18px; white-space: nowrap; }
+  html.landscape-mode .pet-action__label,
+  html.landscape-mode .wand-game__round { white-space: nowrap; }
+  html.landscape-mode .pet-room {
+    grid-area:     room;
+    align-self:    stretch;
+    width:         380px;
+    height:        100%;
+    min-height:    250px;
+    border-bottom: none;
+    border-radius: var(--radius-md);
+  }
+  /* Only the lower two-thirds of the window (it's 104px tall) */
+  html.landscape-mode .pet-room__window { top: -35px; }
+
+  html.landscape-mode .pet-meters {
+    grid-area:             meters;
+    grid-template-columns: auto;
+    gap:                   var(--space-2);
+  }
+  html.landscape-mode .pet-meter__label { width: 3.2em; }
+  html.landscape-mode .pet-meter__cell  { width: 7px; }
+
+  html.landscape-mode .pet-status {
+    grid-area:  status;
+    min-height: 0;
+    max-width:  20ch;
+    font-size:  13px;
+    line-height: 1.4;
+    text-align: left;
+    justify-self: start;
+  }
+
+  html.landscape-mode .pet-actions {
+    grid-area:             actions;
+    grid-template-columns: auto;
+    gap:                   6px;
+    width:                 auto;
+    margin-top:            0;
+  }
+  html.landscape-mode .pet-action {
+    flex-direction:  row;
+    justify-content: flex-start;
+    gap:             var(--space-2);
+    min-height:      38px;
+    padding:         4px var(--space-3) 4px var(--space-2);
+  }
+  html.landscape-mode .pet-action > svg { width: 26px; height: auto; flex-shrink: 0; }
+
+  /* Toy box: one row of six, so it fits the height */
+  html.landscape-mode .pet-toybox {
+    top:        calc(max(var(--space-2), env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px)) + 48px);
+    width:      min(calc(100% - 2 * var(--space-4)), 640px);
+    max-height: calc(100% - 64px);
+    overflow-y: auto;
+  }
+  html.landscape-mode .pet-toybox__grid { grid-template-columns: repeat(6, 1fr); }
+
+  /* String-wand game: the square board sized to the height on the left,
+     round / title / × and the stars on the right */
+  html.landscape-mode .wand-game {
+    display:               grid;
+    grid-template-columns: auto minmax(0, 360px);
+    grid-template-rows:    auto auto 1fr;
+    grid-template-areas:   "stage top"
+                           "stage msg"
+                           "stage stars";
+    justify-content:       center;
+    align-items:           start;
+    column-gap:            var(--space-6);
+    padding:               max(var(--space-2), env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px))
+                           var(--space-4)
+                           max(var(--space-2), env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  }
+  html.landscape-mode .wand-game__top    { grid-area: top; width: 100%; grid-template-columns: auto 1fr auto; column-gap: var(--space-3); }
+  html.landscape-mode .wand-game__stage  { grid-area: stage; width: min(360px, calc(100dvh - 56px - 44px)); }
+  html.landscape-mode .wand-game__msg    { grid-area: msg; }
+  html.landscape-mode .wand-game__stars  { grid-area: stars; justify-content: center; }
+  html.landscape-mode .wand-game__finish { grid-area: 1 / 1 / 4 / 3; margin-top: 12vh; }
+}
+/* The narrowest phones: a little tighter so nothing spills sideways */
+@media (orientation: landscape) and (min-width: 480px) and (max-width: 700px) {
+  html.landscape-mode .secret-page { column-gap: var(--space-2); }
+  html.landscape-mode .pet-meter__cell { width: 6px; }
+  html.landscape-mode .pet-action { padding: 4px 6px; gap: 6px; }
+  html.landscape-mode .pet-action__label { font-size: 10px; }
+  html.landscape-mode .pet-meter__label  { width: 3em; font-size: 11px; }
+  html.landscape-mode .secret-page__title { font-size: 15px; }
 }

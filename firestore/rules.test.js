@@ -324,6 +324,24 @@ describe('cat game (pet/state)', () => {
     await assertFails(setDoc(doc(alice(), 'users/alice/pet/other'), P()));   // only one cat
   });
 
+  it('accepts the cat exactly as the app saves him (new, after buying and playing, hours later)', async () => {
+    const { newPet, buy, act, tick, awardCoin } = await import('../src/pet/pet.js');
+    const { toCloud } = await import('../src/pet/petCloud.js');
+    const ref = doc(alice(), 'users/alice/pet/state');
+    const t0 = 1790000000000;
+    let s = newPet(t0);
+    await assertSucceeds(setDoc(ref, { ...toCloud(s), syncedAt: serverTimestamp() }));
+    s = buy(s, 'ball', t0).state;
+    s = buy(s, 'wand', t0).state;
+    s = buy(s, 'treats', t0).state;
+    s = act(s, 'play', 'ball', t0 + 1000).state;
+    s = act(s, 'play', 'wand', t0 + 2000, { factor: 1.37 }).state;
+    s = act(s, 'pet', undefined, t0 + 3000).state;
+    s = awardCoin(s, 'task-1', t0 + 4000).state;
+    s = tick(s, t0 + 37.3 * 3600_000);
+    await assertSucceeds(setDoc(ref, { ...toCloud(s), syncedAt: serverTimestamp() }));
+  });
+
   it('nobody else can see or change it', async () => {
     await assertSucceeds(setDoc(doc(alice(), 'users/alice/pet/state'), P()));
     await assertFails(getDoc(doc(bob(), 'users/alice/pet/state')));

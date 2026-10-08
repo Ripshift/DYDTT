@@ -302,12 +302,18 @@ export function mergePets(a, b) {
   if (!b?.found) return migrate(a);
   const A = migrate(a);
   const B = migrate(b);
-  const [base, other] = (B.updatedAt ?? 0) > (A.updatedAt ?? 0) ? [B, A] : [A, B];
+  // A cat just found on this device (newHere) never replaces one that's already
+  // in the account — that one comes back, plus any coins earned here meanwhile.
+  const [base, other] = A.newHere && !B.newHere ? [B, A]
+    : B.newHere && !A.newHere ? [A, B]
+    : (B.updatedAt ?? 0) > (A.updatedAt ?? 0) ? [B, A] : [A, B];
   const seen = new Set(base.awarded);
   const extra = other.awarded.filter(id => !seen.has(id));
-  return {
+  const out = {
     ...base,
     coins: Math.min(MAX_COINS, base.coins + extra.length),
     awarded: [...base.awarded, ...extra].slice(-MAX_AWARDED),
   };
+  delete out.newHere;
+  return out;
 }

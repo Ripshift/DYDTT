@@ -17,9 +17,11 @@ const ln = vi.hoisted(() => ({
 }));
 const app = vi.hoisted(() => ({ listeners: {}, addListener: vi.fn((ev, fn) => { app.listeners[ev] = fn; }), minimizeApp: vi.fn() }));
 const platform = vi.hoisted(() => ({ native: true }));
+const so = vi.hoisted(() => ({ lock: vi.fn(async () => {}), unlock: vi.fn(async () => {}) }));
 
 vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: ln }));
 vi.mock('@capacitor/app', () => ({ App: app }));
+vi.mock('@capacitor/screen-orientation', () => ({ ScreenOrientation: so }));
 vi.mock('../src/platform.js', () => ({ isNative: () => platform.native, platformName: () => 'android' }));
 vi.mock('../src/auth/authManager.js', () => ({}));
 
@@ -27,6 +29,7 @@ import { db, openDb, getSetting, setSetting } from '../src/db/schema.js';
 import { store } from '../src/store.js';
 import { notificationId, toNotification, syncNativeReminders, notificationPermission, exactAlarmsAllowed, MAX_SCHEDULED } from '../src/native/notifications.js';
 import { initNative } from '../src/native/index.js';
+import { syncOrientation, _resetOrientation } from '../src/native/orientation.js';
 import { scheduleReminders } from '../src/push/reminders.js';
 import { setNativePermission, getPermissionState, requestPermission } from '../src/push/client.js';
 import { todayStr, addDays } from '../src/utils/dateHelpers.js';
@@ -221,5 +224,31 @@ describe('initNative', () => {
     expect(store.state.currentDate).toBe(todayStr());
     vi.useRealTimers();
     await app.listeners.appStateChange({ isActive: false });
+  });
+});
+
+describe('screen rotation', () => {
+  beforeEach(() => _resetOrientation());
+
+  it('stays upright unless Landscape Mode is on', async () => {
+    await syncOrientation(false);
+    expect(so.lock).toHaveBeenCalledWith({ orientation: 'portrait' });
+    expect(so.unlock).not.toHaveBeenCalled();
+    await syncOrientation(false);                       // no change → Android not asked again
+    expect(so.lock).toHaveBeenCalledTimes(1);
+    await syncOrientation(true);
+    expect(so.unlock).toHaveBeenCalledTimes(1);
+    await syncOrientation(false);
+    expect(so.lock).toHaveBeenCalledTimes(2);
+  });
+
+  it('follows the Landscape Mode setting once the app starts', async () => {
+    await initNative();
+    expect(so.lock).toHaveBeenLastCalledWith({ orientation: 'portrait' });     // off by default
+    await store.dispatch('SETTING_SET', { key: 'desktopMode', value: true });
+    expect(so.unlock).toHaveBeenCalled();
+    await store.dispatch('SETTING_SET', { key: 'desktopMode', value: false });
+    expect(so.lock).toHaveBeenCalledTimes(2);
+    await store.dispatch('SETTING_SET', { key: 'desktopMode', value: null });
   });
 });

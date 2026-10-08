@@ -24,6 +24,7 @@ import { createMascot }        from './components/Mascot.js';
 import { openSecretPage }      from './components/SecretPage.js';
 import { createPetBowl }       from './components/PetBowl.js';
 import { createDayArrows }     from './components/DayArrows.js';
+import { initGlobalSwipe }     from './components/GlobalSwipe.js';
 import { initDesktopMode, setViewAttr } from './utils/desktopMode.js';
 import { initPet }             from './pet/petStore.js';
 import { isNative }            from './platform.js';
@@ -117,6 +118,9 @@ async function boot() {
 
   // Desktop Mode: ‹ › arrows at the screen edges change the day
   app.appendChild(createDayArrows());
+
+  // Swipe anywhere on the screen to change day (every view)
+  initGlobalSwipe();
 
   router.init();
   // Android app: files are already on the phone — no service worker; OS reminders instead

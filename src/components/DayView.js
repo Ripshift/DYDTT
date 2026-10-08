@@ -52,7 +52,7 @@ export default class DayView {
     }
     this.#container.appendChild(hints);
 
-    this.#swiper = new SwipeController(wrapper);
+    this.#swiper = new SwipeController(wrapper, { pointer: false });   // keys; swipes: GlobalSwipe
     this.#swiper.on('swipe-left',  () => store.dispatch('NAV_NEXT_DAY'));
     this.#swiper.on('swipe-right', () => store.dispatch('NAV_PREV_DAY'));
   }

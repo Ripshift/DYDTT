@@ -21,6 +21,7 @@ beforeEach(async () => {
   html.classList.remove('desktop-mode');
 });
 afterEach(() => {
+  html.classList.remove('wide-layout', 'landscape-mode');
   globalThis.matchMedia = realMatchMedia;
   window.matchMedia = realMatchMedia;
   html.classList.remove('desktop-mode');
@@ -43,6 +44,8 @@ describe('Desktop Mode setting', () => {
     expect(html.classList.contains('desktop-mode')).toBe(false);
     await store.dispatch('SETTING_SET', { key: 'desktopMode', value: true });
     expect(html.classList.contains('desktop-mode')).toBe(true);
+    expect(html.classList.contains('wide-layout')).toBe(true);
+    expect(html.classList.contains('landscape-mode')).toBe(false);
     expect(await getSetting('desktopMode')).toBe(true);
     await store.dispatch('SETTING_SET', { key: 'desktopMode', value: false });
     expect(html.classList.contains('desktop-mode')).toBe(false);
@@ -58,6 +61,7 @@ describe('Desktop Mode setting', () => {
     const sw = app.querySelector('#setting-desktopMode');
     expect(sw).not.toBeNull();
     expect(sw.checked).toBe(false);
+    expect(sw.closest('.toggle-row').querySelector('.toggle-label').textContent).toBe('Desktop Mode');
     expect(sw.closest('.toggle-row').nextElementSibling.textContent).toMatch(/Automatic/);
     sw.checked = true;
     sw.dispatchEvent(new Event('change'));

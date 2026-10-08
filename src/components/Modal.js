@@ -7,7 +7,7 @@
 
 import { createFocusTrap, announce }                    from '../utils/a11y.js';
 import { store }                                         from '../store.js';
-import { isDesktopMode } from '../utils/desktopMode.js';
+import { isDesktopMode, modeLabel } from '../utils/desktopMode.js';
 import { signInWithGoogle, signInWithEmail,
          signUpWithEmail, resetPassword,
          signOutUser }                                   from '../auth/authManager.js';
@@ -150,12 +150,12 @@ export default class Modal {
     p.appendChild(viewSection);
     this.#unsubs.push(store.subscribe('settings', (s) => syncPicker(s.activeView ?? 'day')));
 
-    // Desktop Mode: wide layouts, ‹ › arrows, no swiping between days
+    // Desktop Mode (website) / Landscape Mode (app): wide layouts
     {
       const row = document.createElement('div');
       row.className = 'toggle-row';
       const lbl = document.createElement('label');
-      lbl.className = 'toggle-label'; lbl.htmlFor = 'setting-desktopMode'; lbl.textContent = 'Desktop Mode';
+      lbl.className = 'toggle-label'; lbl.htmlFor = 'setting-desktopMode'; lbl.textContent = modeLabel();
       const sw  = document.createElement('label'); sw.className = 'toggle-switch';
       const inp = document.createElement('input');
       inp.type = 'checkbox'; inp.id = 'setting-desktopMode';
@@ -165,8 +165,10 @@ export default class Modal {
       hint.className = 'settings-hint';
       const sync = (st) => {
         inp.checked = isDesktopMode(st);
-        hint.textContent = 'Wide layout for a computer screen. Use the ‹ › arrows to change day — swiping won\'t.'
-          + (st.desktopMode == null ? ' (Automatic for this screen.)' : '');
+        hint.textContent = (isNative()
+          ? 'When on, turning your phone or tablet sideways widens the layouts to fit — the date sidebar, the two days side by side, the 3×3 grid next to the tasks, and the cat\'s room. Swipe to change day as usual.'
+          : 'Wide layout for a computer screen. Use the ‹ › arrows to change day — swiping won\'t.'
+            + (st.desktopMode == null ? ' (Automatic for this screen.)' : ''));
       };
       inp.addEventListener('change', () => store.dispatch('SETTING_SET', { key: 'desktopMode', value: inp.checked }));
       sync(store.state.settings);

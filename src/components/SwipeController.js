@@ -13,19 +13,25 @@ export default class SwipeController {
   #startX    = 0;
   #startY    = 0;
   #active    = false;
+  #pointer   = true;
 
-  constructor(el, { threshold = 50 } = {}) {
+  /** @param {{ threshold?: number, pointer?: boolean }} [opts] pointer: false = keyboard only
+   *  (the app's swipes are handled screen-wide by GlobalSwipe.js) */
+  constructor(el, { threshold = 50, pointer = true } = {}) {
     this.#el        = el;
     this.#threshold = threshold;
+    this.#pointer   = pointer;
     this.#attach();
   }
 
   #attach() {
     const el = this.#el;
-    el.addEventListener('pointerdown',   this.#onDown,   { passive: true });
-    el.addEventListener('pointermove',   this.#onMove,   { passive: true });
-    el.addEventListener('pointerup',     this.#onUp,     { passive: true });
-    el.addEventListener('pointercancel', this.#onCancel, { passive: true });
+    if (this.#pointer) {
+      el.addEventListener('pointerdown',   this.#onDown,   { passive: true });
+      el.addEventListener('pointermove',   this.#onMove,   { passive: true });
+      el.addEventListener('pointerup',     this.#onUp,     { passive: true });
+      el.addEventListener('pointercancel', this.#onCancel, { passive: true });
+    }
     el.addEventListener('keydown',       this.#onKey);
   }
 

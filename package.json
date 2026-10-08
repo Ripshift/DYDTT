@@ -1,7 +1,7 @@
 {
   "name": "dydtt-phase1",
   "version": "1.0.0",
-  "description": "Do Your Daily Tasks Today \u2014 Phase 1 PWA",
+  "description": "Do Your Daily Tasks Today — Phase 1 PWA",
   "private": true,
   "type": "module",
   "scripts": {
@@ -30,6 +30,7 @@
     "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.5.2",
     "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/screen-orientation": "^8.0.2",
     "dexie": "^4.0.8",
     "firebase": "^12.19.0",
     "workbox-background-sync": "^7.3.0",

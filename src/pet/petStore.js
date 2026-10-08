@@ -12,6 +12,7 @@ import { getSetting, setSetting } from '../db/schema.js';
 import { onTaskDone, store } from '../store.js';
 import { newPet, tick, act, buy, awardCoin, migrate, mergePets, expiredToys } from './pet.js';
 import { todayStr } from '../utils/dateHelpers.js';
+import { showToast } from '../utils/toast.js';
 
 const KEY = 'pet';
 export const UPLOAD_DELAY_MS = 1200;
@@ -26,6 +27,10 @@ let cloud = null;                       // { put, listen } — Firestore by defa
 let uid = null;
 let stopListen = null;
 let uploadTimer = null;
+let serverSeen = false;                 // heard from the account at least once (safe to upload)
+let syncError = null;                   // the listener failed; retried on resume / reconnect
+let warned = false;
+export const FIRST_LOOK_MS = 5000;      // how long a newly found cat waits to hear from the account
 
 function emit(event = {}) {
   for (const fn of listeners) fn(pet, event);
@@ -42,7 +47,9 @@ async function save() {
 }
 
 function scheduleUpload() {
-  if (!uid || !cloud || !pet) return;
+  // Never upload before hearing from the account: this device's cat could
+  // overwrite the one you already have.
+  if (!uid || !cloud || !pet || !serverSeen) return;
   clearTimeout(uploadTimer);
   uploadTimer = setTimeout(uploadNow, UPLOAD_DELAY_MS);
 }
@@ -50,11 +57,12 @@ function scheduleUpload() {
 export async function uploadNow() {
   clearTimeout(uploadTimer);
   uploadTimer = null;
-  if (!uid || !cloud || !pet) return;
+  if (!uid || !cloud || !pet || !serverSeen) return;
   try {
     await cloud.put(uid, pet);
   } catch (err) {
     console.error('[Pet] upload failed', err);
+    reportProblem(err);
   }
 }
 
@@ -91,26 +99,63 @@ export async function initPet({ cloud: c } = {}) {
   });
   startSync(store.state.user?.uid ?? null);
   lastUid = store.state.user?.uid ?? null;
+  if (!onlineHooked && typeof window !== 'undefined') {
+    onlineHooked = true;
+    window.addEventListener('online', () => { resumePetSync(); });
+  }
 
   emit(lost.length ? { lost } : {});
   return pet;
 }
 
-function startSync(nextUid) {
-  if (nextUid === uid && stopListen) return;
+let onlineHooked = false;
+
+function startSync(nextUid, force = false) {
+  if (!force && nextUid === uid && stopListen && !syncError) return;
   stopListen?.();
   stopListen = null;
   clearTimeout(uploadTimer);
   uid = nextUid;
+  serverSeen = false;
+  syncError = null;
   if (!uid || !cloud) return;
-  stopListen = cloud.listen(uid, (remote) => { onRemote(remote); },
-    (err) => console.error('[Pet] sync', err));
+  stopListen = cloud.listen(uid, (remote, meta) => { onRemote(remote, meta); },
+    (err) => {
+      console.error('[Pet] sync', err);
+      syncError = err;
+      reportProblem(err);
+    });
 }
 
-/** The account's copy changed (or was read for the first time). */
-export async function onRemote(remote) {
+/** App back in front / back online: if syncing the cat had failed, try again. */
+export function resumePetSync() {
+  if (uid && cloud && (syncError || !stopListen)) startSync(uid, true);
+}
+
+function reportProblem(err) {
+  if (warned || err?.code !== 'permission-denied') return;
+  warned = true;
+  showToast({
+    title:   "Your cat couldn't sync",
+    message: 'The account refused his save (permission denied). The database rules may need publishing.',
+    variant: 'error',
+    timeout: 8000,
+  });
+}
+
+/**
+ * The account's copy changed (or was read for the first time).
+ * @param {object|null} remote
+ * @param {{ fromCache?: boolean }} [meta] fromCache: only this device's memory, not the server
+ */
+export async function onRemote(remote, { fromCache = false } = {}) {
+  if (!fromCache) serverSeen = true;
   if (!remote?.found) {
-    if (pet?.found) await uploadNow();       // first device to find him: put him in the account
+    // Not from the server? Then "no cat" might just mean "not loaded yet".
+    if (!fromCache && pet?.found) {             // first device to find him: put him in the account
+      if (pet.newHere) { pet = { ...pet }; delete pet.newHere; await saveLocal(); }
+      await uploadNow();
+    }
     return;
   }
   const before = pet;
@@ -122,7 +167,7 @@ export async function onRemote(remote) {
   const remoteMissing = merged.coins !== remote.coins
     || (merged.updatedAt ?? 0) > (remote.updatedAt ?? 0)
     || merged.awarded.length !== (remote.awarded ?? []).length;
-  if (remoteMissing) scheduleUpload();       // we know something the account doesn't
+  if (remoteMissing) scheduleUpload();       // we know something the account doesn't (once the server's been heard)
   emit({
     synced: true,
     found: !before?.found,
@@ -147,7 +192,25 @@ export function subscribePet(fn) {
 /** First visit to the secret page: the game begins. */
 export async function markFound() {
   if (pet?.found) return pet;
-  pet = newPet();
+  // Signed in? Your account may already have him (another phone, or before a
+  // reinstall) — look there first so he comes back instead of a new cat.
+  if (uid && cloud?.get) {
+    let remote = null;
+    try {
+      remote = await Promise.race([cloud.get(uid), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), FIRST_LOOK_MS))]);
+      serverSeen = true;
+    } catch (err) {
+      console.warn('[Pet] could not check the account', err);
+    }
+    if (remote?.found) {
+      pet = mergePets(null, remote);
+      catchUp();
+      await saveLocal();
+      emit({ found: true, synced: true });
+      return pet;
+    }
+  }
+  pet = { ...newPet(), newHere: true };       // until the account confirms it has no cat, its cat wins
   await save();
   await setSetting('petHelloDay', todayStr());   // you've just met — first hello is tomorrow
   emit({ found: true });
@@ -213,4 +276,7 @@ export function _resetPet() {
   uploadTimer = null;
   uid = null;
   cloud = null;
+  serverSeen = false;
+  syncError = null;
+  warned = false;
 }

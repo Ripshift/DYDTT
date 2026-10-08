@@ -5,6 +5,7 @@
  *   • hardware back button: close dialog → close menu → leave shared calendar → minimise
  *   • re-check reminders and the day when the app comes back to the front
  *   • the cat game: a daily hello notification once he's been found; tap → his page
+ *   • stays upright unless Landscape Mode is on
  */
 
 import { App } from '@capacitor/app';
@@ -18,12 +19,18 @@ import { getSetting, setSetting } from '../db/schema.js';
 import { todayStr } from '../utils/dateHelpers.js';
 import { showToast } from '../utils/toast.js';
 import { isSecretOpen, secretBack, openSecretPage } from '../components/SecretPage.js';
-import { initPet, getPet, refreshPet } from '../pet/petStore.js';
+import { initPet, getPet, refreshPet, resumePetSync } from '../pet/petStore.js';
 import { notificationText } from '../pet/pet.js';
 import { sayHelloOncePerDay, setupPetChannel } from './petNotify.js';
+import { syncOrientation } from './orientation.js';
+import { isDesktopMode } from '../utils/desktopMode.js';
 
 export async function initNative() {
   document.documentElement.classList.add('native-app');
+
+  // Upright only, unless Landscape Mode is on (then the phone may turn)
+  syncOrientation(isDesktopMode(store.state.settings));
+  store.subscribe('settings', (st) => syncOrientation(isDesktopMode(st)));
   await setupNotifications();
   await setupPetChannel();
 
@@ -89,6 +96,7 @@ export async function initNative() {
       if (wasToday) await store.dispatch('NAV_TO_DATE', { date: lastDay });
     }
     scheduleReminders();
+    resumePetSync();
     await refreshPet();
     if (nowPerm === 'granted') await sayHelloOncePerDay(getPet(), notificationText);
   });

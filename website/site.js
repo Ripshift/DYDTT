@@ -1,6 +1,6 @@
 /* DYDTT site — tiny helpers. Edit the two constants below. */
 const WEB_APP_URL = "https://dydtt.vercel.app/";
-const APK_FILE    = "downloads/DYDTT-v0.5b.apk";
+const APK_FILE    = "downloads/DYDTT-v0.6b.apk";
 
 document.querySelectorAll("[data-webapp]").forEach(a => {
   if (WEB_APP_URL) { a.href = WEB_APP_URL; a.target = "_blank"; a.rel = "noopener"; }

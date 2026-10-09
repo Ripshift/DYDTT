@@ -250,3 +250,7 @@ th{color:var(--text3);font-weight:600;font-size:.75rem;letter-spacing:.08em;text
 .specs dd{margin:.15rem 0 0;font-size:.92rem;color:var(--text)}
 .sha span{color:var(--gold-500);font-weight:600;margin-right:.4rem}
 @media(max-width:700px){.specs{grid-template-columns:1fr 1fr}}
+
+nav a.nav-app{margin-left:.4rem;background:var(--gold-400);color:#141414;font-weight:600}
+nav a.nav-app:hover{background:var(--gold-300);color:#141414}
+@media(max-width:560px){nav a.nav-app{margin-left:.1rem}}
